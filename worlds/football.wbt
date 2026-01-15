@@ -1,0 +1,191 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/BrushedAluminium.proto"
+
+WorldInfo {
+  FPS 20
+}
+Viewpoint {
+  orientation 0.1830533763935071 0.9494983884857155 -0.25484165996548974 1.5141549789765316
+  position -1.056408977282545 0.48018952857474984 5.559724040518994
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+  texture "stadium"
+}
+RectangleArena {
+  floorSize 2.625 1.7
+  floorAppearance PBRAppearance {
+    baseColor 0.333333 1 0
+    baseColorMap ImageTexture {
+      url [
+        ""
+      ]
+      repeatS FALSE
+      repeatT FALSE
+      filtering 5
+    }
+    roughness 1
+    roughnessMap ImageTexture {
+      url [
+        "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/textures/parquetry/mosaic_parquetry_roughness.jpg"
+      ]
+    }
+    metalness 0
+    normalMap ImageTexture {
+      url [
+        "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/textures/parquetry/mosaic_parquetry_normal.jpg"
+      ]
+    }
+    occlusionMap ImageTexture {
+      url [
+        "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/textures/parquetry/mosaic_parquetry_occlusion.jpg"
+      ]
+    }
+    textureTransform TextureTransform {
+      scale 0.5 0.3
+    }
+  }
+  wallHeight 0.15
+  wallAppearance BrushedAluminium {
+    colorOverride 0 0 1
+  }
+}
+E-puck {
+  hidden position_0_0 13227.68053381469
+  hidden position_0_1 14917.12539844375
+  hidden linearVelocity_0 0.024793579744303237 0.05002335434362739 -8.847623795849324e-09
+  hidden angularVelocity_0 0.004564631453985576 -0.0022722317120181766 0.09330764021972363
+  hidden rotation_1 0 -0.9999999999999999 0 4.707723105519496
+  hidden linearVelocity_1 0.02370441874755512 0.04782657852035656 -1.2163084495148218e-08
+  hidden angularVelocity_1 -2.3811629795788916 1.1800911732833772 0.09503226317340284
+  hidden rotation_2 0 0.9999999999999999 0 0.8434791994115768
+  hidden linearVelocity_2 0.025859730278856814 0.052174774114957884 1.1196292870600058e-08
+  hidden angularVelocity_2 -2.6189301412288426 1.2980609741988325 0.09530208674860063
+  translation 0.9613292241960598 -0.33684448257679617 -6.43161503031571e-05
+  rotation 9.803595127308237e-05 -0.0003592852286454617 -0.999999930651536 -1.1124172668216525
+}
+DEF left_post_1 Solid {
+  translation 1.27 0.2 0
+  children [
+    Shape {
+      geometry Box {
+        size 0.1 0.01 0.3
+      }
+    }
+  ]
+}
+DEF right_post_1 Solid {
+  translation 1.27 -0.2 0
+  children [
+    Shape {
+      geometry Box {
+        size 0.1 0.01 0.3
+      }
+    }
+  ]
+  name "solid(1)"
+}
+DEF cross_bar_1 Solid {
+  translation 1.27 0 0.15
+  children [
+    Shape {
+      geometry Box {
+        size 0.1 0.4 0.01
+      }
+    }
+  ]
+  name "solid(2)"
+}
+DEF goal_line_1 Solid {
+  translation 1.22 0 0
+  children [
+    Shape {
+      geometry Box {
+        size 0.01 1.57 0.001
+      }
+    }
+  ]
+  name "solid(3)"
+}
+DEF left_post_2 Solid {
+  translation -1.27 0.2 0
+  children [
+    Shape {
+      geometry Box {
+        size 0.1 0.01 0.3
+      }
+    }
+  ]
+  name "solid(4)"
+}
+DEF right_post_2 Solid {
+  translation -1.27 -0.2 0
+  children [
+    Shape {
+      geometry Box {
+        size 0.1 0.01 0.3
+      }
+    }
+  ]
+  name "solid(5)"
+}
+DEF cross_bar_2 Solid {
+  translation -1.27 0 0.15
+  children [
+    Shape {
+      geometry Box {
+        size 0.1 0.4 0.01
+      }
+    }
+  ]
+  name "solid(6)"
+}
+DEF goal_line_2 Solid {
+  translation -1.22 0 0
+  children [
+    Shape {
+      geometry Box {
+        size 0.01 1.57 0.001
+      }
+    }
+  ]
+  name "solid(7)"
+}
+DEF centre_line Solid {
+  children [
+    Shape {
+      geometry Box {
+        size 0.01 1.57 0.001
+      }
+    }
+  ]
+  name "solid(8)"
+}
+DEF left_touchline Solid {
+  translation 0 0.78 0
+  children [
+    Shape {
+      geometry Box {
+        size 2.43 0.01 0.01
+      }
+    }
+  ]
+  name "solid(9)"
+}
+DEF right_touchline Solid {
+  translation 0 -0.78 0
+  children [
+    Shape {
+      geometry Box {
+        size 2.43 0.01 0.01
+      }
+    }
+  ]
+  name "solid(10)"
+}

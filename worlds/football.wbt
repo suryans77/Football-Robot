@@ -3,16 +3,16 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
-EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/BrushedAluminium.proto"
+EXTERNPROTO "../protos/SoccerBall.proto"
 EXTERNPROTO "../protos/E-puckPlus.proto"
 
 WorldInfo {
   FPS 20
 }
 Viewpoint {
-  orientation -0.26101474151469095 0.08141633822486329 0.9618953605159315 2.378407607278845
-  position 0.06899734233292411 -1.4163235717222942 1.033659608467139
+  orientation 0.22595356200180036 0.08017008643420273 -0.9708335310751433 2.6742146370702495
+  position 2.7252698057580176 1.5886159240501656 1.9215559064051004
 }
 TexturedBackground {
 }
@@ -56,23 +56,6 @@ RectangleArena {
   wallAppearance BrushedAluminium {
     colorOverride 0 0 1
   }
-}
-E-puck {
-  hidden position_0_0 21366.47647455177
-  hidden position_0_1 23855.16179334165
-  hidden linearVelocity_0 0.04032966241488249 0.03902668252640573 1.57320646583981e-08
-  hidden angularVelocity_0 -0.006523555402325167 0.006750904018276148 0.09281320098926207
-  hidden rotation_1 0 0.9999999999999999 0 3.6464301411773676
-  hidden linearVelocity_1 0.03862894300673688 0.037381230236475466 -6.563913146351341e-09
-  hidden angularVelocity_1 -1.8611462367468015 1.9231947444382147 0.09455355634730264
-  hidden rotation_2 0 1 0 4.190367287938907
-  hidden linearVelocity_2 0.04209775231592328 0.04073771693544686 6.335733360181854e-09
-  hidden angularVelocity_2 -2.0447142109334346 2.1130500868195763 0.09482572041992453
-  translation 0.8296555812439463 -0.48698389150286436 -6.431505486723804e-05
-  rotation -0.00021070821564358997 0.0009267170126520563 0.9999995483987112 0.7707283337177614
-  controllerArgs [
-    ""
-  ]
 }
 DEF left_post_1 Solid {
   translation 1.27 0.2 0
@@ -193,13 +176,23 @@ DEF right_touchline Solid {
   ]
   name "solid(10)"
 }
+SoccerBall {
+  translation -0.062184778580024636 0.7015379834105082 0.020929368000000007
+}
 E-puckPlus {
-  hidden position_0_0 -54.574664758027495
-  hidden position_0_1 -54.59299447749633
-  hidden rotation_1 0 -0.9999999999999999 0 4.309182300590804
-  hidden rotation_2 0 -0.9999999999999999 0 4.3275120200596415
-  translation -1.234664350797353 -0.737255916615039 0.05869497596442724
-  rotation -0.09451866265856725 0.9954116713038016 0.014893859184516637 2.8304344570363926
-  name "e-puck(1)"
-  controller "e_puck_avoid_obstacles"
+  hidden position_0_0 -626.4362764829087
+  hidden position_0_1 -626.4362764862656
+  hidden linearVelocity_0 -2.022507209574006e-07 -0.00015782395751219255 1.4126594533837254e-07
+  hidden angularVelocity_0 2.444735124178972e-08 9.398871394036615e-06 -1.88404773899489e-07
+  hidden translation_1 0 0.026000000000000138 0.02
+  hidden rotation_1 0 1 0 1.8822542350499094
+  hidden linearVelocity_1 -5.7142456258448165e-08 -0.00015895536390449645 1.3780168801615118e-07
+  hidden angularVelocity_1 0.007970263587376696 -20.999988284380816 0.0032269236602575366
+  hidden translation_2 0 -0.025999999999999992 0.02
+  hidden rotation_2 0 0.9999999999999999 0 1.8822542316930782
+  hidden linearVelocity_2 -6.62328000916279e-08 -0.00015895537251957013 1.3878499887097568e-07
+  hidden angularVelocity_2 0.007969366012759663 -20.99998828490847 0.00322591959327914
+  translation -1.2761030335348869 -0.0015845537557756507 -9.727447546455711e-05
+  rotation -0.018070666376919953 0.9988641463209152 0.04408932083036996 0.008592719339179525
+  controller "light_sensor"
 }

@@ -1,0 +1,45 @@
+#VRML_SIM R2025a utf8
+
+PROTO SoccerBall [
+  field SFVec3f translation 0 0 0.021
+  field SFFloat radius 0.021
+  field SFFloat mass 0.045
+]
+{
+  Solid {
+    translation IS translation
+    name "soccer ball"
+
+    children [
+      Shape {
+        appearance PBRAppearance {
+        baseColor 1 0.6 0
+        roughness 0.6
+        metalness 0
+        }
+
+        geometry Sphere {
+          radius IS radius
+          subdivision 4
+        }
+      }
+    ]
+
+    boundingObject Sphere {
+      radius IS radius
+    }
+
+    physics Physics {
+      density -1
+      mass IS mass
+
+      # Soccer tuning
+      coulombFriction [
+        0.8 0.8
+      ]
+
+      rollingFriction 0.08
+      restitution 0.2
+    }
+  }
+}

@@ -1,5 +1,8 @@
 from controller import Robot
+import cv2
+import numpy as np
 
+# 1. INITIALIZATION
 robot = Robot()
 timestep = int(robot.getBasicTimeStep())
 
@@ -7,60 +10,88 @@ timestep = int(robot.getBasicTimeStep())
 camera = robot.getDevice("camera")
 camera.enable(timestep)
 
+ps0 = robot.getDevice("ps0") # Right
+ps7 = robot.getDevice("ps7") # Left
+ps0.enable(timestep); ps7.enable(timestep)
+
 left_motor = robot.getDevice("left wheel motor")
 right_motor = robot.getDevice("right wheel motor")
-left_motor.setPosition(float('inf'))
-right_motor.setPosition(float('inf'))
+left_motor.setPosition(float('inf')); right_motor.setPosition(float('inf'))
 
-MAX_SPEED = 15.0 # Using your agile parameters
+# ------------------ PARAMETERS ------------------
+MAX_SPEED = 14.0
+DRIBBLE_SPEED = 5.0
+SEARCH_SPEED = 4.0
+IN_POCKET_LIMIT = 3500
+
+# HSV Ranges for Orange (Ignores Brown)
+# Hue: 0-15 is the orange/red spectrum
+# Saturation: 150-255 filters out gray/brown/muddy colors
+# Value: 50-255 filters out pure black shadows
+LOWER_ORANGE = np.array([0, 150, 50])
+UPPER_ORANGE = np.array([20, 255, 255])
+
+print("=== OpenCV High-Friction Dribbler ONLINE ===")
 
 while robot.step(timestep) != -1:
-    image = camera.getImage()
+    # --- 1. SENSOR READS ---
+    dist_l = ps0.getValue()
+    dist_r = ps7.getValue()
+    
+    # --- 2. OPENCV PROCESSING ---
+    image_data = camera.getImage()
     width = camera.getWidth()
     height = camera.getHeight()
 
-    ball_x = -1
-    pixels_found = 0
-    sum_x = 0
+    # Convert Webots BGRA string to Numpy Array
+    frame = np.frombuffer(image_data, np.uint8).reshape((height, width, 4))
+    
+    # Convert to BGR then to HSV
+    bgr = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+    
+    # Create the Mask
+    mask = cv2.inRange(hsv, LOWER_ORANGE, UPPER_ORANGE)
+    
+    # Calculate Moments to find the center of the "blob"
+    moments = cv2.moments(mask)
+    pixels_found = moments['m00'] # This is the total area of the mask
 
-    # Scan the image for Yellow/Orange pixels
-    for x in range(width):
-        for y in range(height):
-            # Webots getImage returns a BGRA byte string
-            # Indexing: 4 * (y * width + x)
-            r = camera.imageGetRed(image, width, x, y)
-            g = camera.imageGetGreen(image, width, x, y)
-            b = camera.imageGetBlue(image, width, x, y)
-
-            # Color Logic: High Red + High Green + Low Blue = Yellow/Orange
-            if r > 150 and g > 100 and b < 80:
-                sum_x += x
-                pixels_found += 1
-
-    if pixels_found > 0:
-        # Calculate the horizontal center of the ball
-        ball_x = sum_x / pixels_found
-        
-        # Determine deviation from center (0.0 is center, -1.0 is left, 1.0 is right)
+    # --- 3. CONTROL LOGIC ---
+    
+    # If the ball is detected (Area > 0)
+    if pixels_found > 100: 
+        # Calculate horizontal center (X)
+        ball_x = int(moments['m10'] / moments['m00'])
         deviation = (ball_x / width) - 0.5
         
-        # Human-like steering logic
-        if abs(deviation) < 0.1:
-            # Ball is centered -> Sprint forward
-            left_speed = MAX_SPEED
-            right_speed = MAX_SPEED
-        elif deviation < 0:
-            # Ball is to the left -> Turn left
-            left_speed = MAX_SPEED * 0.2
-            right_speed = MAX_SPEED
+        # Check if ball is in the funnel pocket
+        is_in_pocket = dist_l > IN_POCKET_LIMIT or dist_r > IN_POCKET_LIMIT
+        
+        if is_in_pocket:
+            # Maintain a steady nudge speed
+            base_speed = DRIBBLE_SPEED
+            gain = 4.0
         else:
-            # Ball is to the right -> Turn right
-            left_speed = MAX_SPEED
-            right_speed = MAX_SPEED * 0.2
-    else:
-        # Ball lost -> Pivot on spot to find it
-        left_speed = MAX_SPEED * 0.5
-        right_speed = -MAX_SPEED * 0.5
+            # Chase speed logic
+            # Use area (pixels_found) as a distance estimate
+            if pixels_found > 5000: # Ball is close
+                base_speed = DRIBBLE_SPEED + 2
+                gain = 8.0
+            else: # Ball is far
+                base_speed = MAX_SPEED
+                gain = 15.0
 
+        # Steering
+        turn_effort = 0.0 if abs(deviation) < 0.03 else (deviation * gain)
+        left_speed = base_speed + turn_effort
+        right_speed = base_speed - turn_effort
+        
+    else:
+        # Ball lost -> Search
+        left_speed = SEARCH_SPEED
+        right_speed = -SEARCH_SPEED
+
+    # --- 4. ACTUATION ---
     left_motor.setVelocity(left_speed)
     right_motor.setVelocity(right_speed)

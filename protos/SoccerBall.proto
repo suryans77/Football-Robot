@@ -9,18 +9,19 @@ PROTO SoccerBall [
   Solid {
     translation IS translation
     name "soccer ball"
+    contactMaterial "ball_mat" 
 
     children [
       Shape {
         appearance PBRAppearance {
-        baseColor 1 0.6 0
-        roughness 0.6
-        metalness 0
+          baseColor 1 0.6 0
+          roughness 0.6
+          metalness 0
         }
-
         geometry Sphere {
           radius IS radius
-          subdivision 4
+          # INCREASED: subdivision 16 makes the physics calculation smooth
+          subdivision 16 
         }
       }
     ]
@@ -32,14 +33,22 @@ PROTO SoccerBall [
     physics Physics {
       density -1
       mass IS mass
+      
+      # DAMPING: Keep these high to stop the ball from rolling forever
+      damping Damping {
+        linear 0.5   
+        angular 0.5  
+      }
 
-      # Soccer tuning
+      # FRICTION & BOUNCE SETTINGS
+      # High coulombFriction (0.8) makes it "nudgeable" without sliding away like ice
       coulombFriction [
-        0.8 0.8
+        0.8
       ]
-
-      rollingFriction 0.08
-      restitution 0.2
+      # rollingFriction (0.1) provides resistance against the floor
+      rollingFriction 0.1
+      # restitution (0.1) makes the ball "dead" so it doesn't bounce off your robot
+      restitution 0.1
     }
   }
 }

@@ -31,7 +31,7 @@ PROTO E-puckPlus [
   field SFRotation         camera_rotation              0 0 1 0                  # Is `Camera.rotation`. Interesting setup: set `0 1 0 0.47` in order to simulate the linear camera mode.
   field SFFloat            camera_noise                 0.0                      # Is `Camera.noise`.
   field SFFloat            camera_motionBlur            0.0                      # Is `Camera.motionBlur`.
-  field SFInt32            distance_sensor_numberOfRays 1                        # Is `DistanceSensor.numberOfRays`.
+  field SFInt32            distance_sensor_numberOfRays 1                       # Is `DistanceSensor.numberOfRays`.
   field SFInt32            emitter_channel              1                        # Is `Emitter.channel`.
   field SFInt32            receiver_channel             1                        # Is `Receiver.channel`.
   field MFNode             turretSlot                   []                       # Extends the robot with new nodes in the turret slot.
@@ -48,6 +48,7 @@ Robot {
   translation IS translation
   rotation IS rotation
   children [
+
     HingeJoint {
       jointParameters HingeJointParameters {
         axis 0 1 0
@@ -56,7 +57,7 @@ Robot {
       device [
         RotationalMotor {
           name "left wheel motor"
-          consumptionFactor -0.001 # small trick to encourage the movement (calibrated for the rat's life contest)
+          consumptionFactor -0.001 
           maxVelocity 21.0
           maxAcceleration 70.0 
         }
@@ -597,6 +598,41 @@ Robot {
         }
       ]
     }
+    # Ball Dribbler / Guard (Funnel Shape Version)
+    DEF DRIBBLER Solid {
+      translation 0.038 0 0.01 
+      children [
+        DEF DRIBBLER_SHAPE Shape {
+          appearance PBRAppearance {
+            baseColor 0.1 0.1 0.1
+            roughness 1
+            metalness 0
+          }
+          geometry IndexedFaceSet {
+            coord Coordinate {
+              point [
+                # Right wing (Angled Inward)
+                0.00 -0.022 0,    # 0: Back Inner
+                0.05 -0.045 0,    # 1: Front Outer (Widened from -0.028)
+                0.035 -0.045 0.02, # 2: Front Top Outer
+                0.00 -0.022 0.02, # 3: Back Top Inner
+                
+                # Left wing (Angled Inward)
+                0.00  0.022 0,    # 4: Back Inner
+                0.05  0.045 0,    # 5: Front Outer (Widened from 0.028)
+                0.035  0.045 0.02, # 6: Front Top Outer
+                0.00  0.022 0.02  # 7: Back Top Inner
+              ]
+            }
+            coordIndex [
+              0, 1, 2, 3, -1, # Right plate funnel
+              4, 5, 6, 7, -1  # Left plate funnel
+            ]
+          }
+        }
+      ]
+      boundingObject USE DRIBBLER_SHAPE
+    }
     DEF EPUCK_LEFT_COLUMN Pose {
       translation 0.0254 0.0193 0.0426
       children [
@@ -658,7 +694,8 @@ Robot {
       }
     %< } >%
     DEF EPUCK_PS0 DistanceSensor {
-      translation 0.03 -0.01 0.033
+      translation 0.12 -0.035
+       0.033
       rotation 0 1 0 0  # Adjusted to look straight ahead
       name "ps0"
       lookupTable [ 0 4095 0, 0.1 1000 0, 0.5 200 0.01, 1.5 0 0 ]
@@ -707,7 +744,7 @@ Robot {
       numberOfRays IS distance_sensor_numberOfRays
     }
     DEF EPUCK_PS7 DistanceSensor {
-      translation 0.03 0.01 0.033
+      translation 0.12 0.035 0.033
       rotation 0 1 0 0 # Adjusted to look straight ahead
       name "ps7"
       lookupTable [ 0 4095 0, 0.1 1000 0, 0.5 200 0.01, 1.5 0 0 ]

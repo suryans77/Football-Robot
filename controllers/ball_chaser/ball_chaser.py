@@ -19,8 +19,8 @@ right_motor = robot.getDevice("right wheel motor")
 left_motor.setPosition(float('inf')); right_motor.setPosition(float('inf'))
 
 # ------------------ PARAMETERS ------------------
-MAX_SPEED = 14.0
-DRIBBLE_SPEED = 5.0
+MAX_SPEED = 21.0
+DRIBBLE_SPEED = 7.0
 SEARCH_SPEED = 4.0
 IN_POCKET_LIMIT = 3500
 

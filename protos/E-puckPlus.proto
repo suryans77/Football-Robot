@@ -600,31 +600,58 @@ Robot {
     }
     # Heavy Duty Dribbler (Thick Bounding Volumes)
     DEF DRIBBLER Pose {
-      translation 0.038 0 0.01 
+      translation 0.02 0 0.01 
       children [
-        DEF WING_R Transform {
-          translation 0.03 -0.03 0.005
-          rotation 0 0 1 -0.4
-          children [ 
-            DEF WING_GEOM_R Shape { 
+          # --- RIGHT WING (Shorter and Wider) ---
+          DEF WING_R Transform {
+            translation 0.02 -0.04 0.005      # Moved further out (-0.04) and back (0.02)
+            rotation 0 0 1 -0.4
+            children [ 
+              DEF WING_GEOM_R Shape { 
                 appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 1 }
-                geometry Box { size 0.05 0.005 0.025 } 
-            } 
-          ]
-        }
-        DEF WING_L Transform {
-          translation 0.03 0.03 0.005
-          rotation 0 0 1 0.4
-          children [ 
-            DEF WING_GEOM_L Shape { 
+                geometry Box { size 0.07 0.005 0.025 } 
+                contactMaterial "high_grip"
+              } 
+              # RIGHT FRONT DOOR (Longer)
+              Transform {
+                translation 0.033 0.011 0    # Adjusted for shorter wing
+                rotation 0 0 1 1.57 
+                children [
+                  Shape {
+                    appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 1 }
+                    geometry Box { size 0.027 0.005 0.025 } 
+                    contactMaterial "high_grip"
+                  }
+                ]
+              }
+            ]
+          }
+          # --- LEFT WING (Shorter and Wider) ---
+          DEF WING_L Transform {
+            translation 0.02 0.04 0.005       # Moved further out (0.04) and back (0.02)
+            rotation 0 0 1 0.4
+            children [ 
+              DEF WING_GEOM_L Shape { 
                 appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 1 }
-                geometry Box { size 0.05 0.005 0.025 } 
-            } 
-          ]
-        }
-      ]
-      # The Pose node doesn't use boundingObject, so we delete it here.
-    }
+                geometry Box { size 0.07 0.005 0.025 } 
+                contactMaterial "high_grip"
+              } 
+              # LEFT FRONT DOOR (Longer)
+              Transform {
+                translation 0.033 -0.011 0   # Adjusted for shorter wing
+                rotation 0 0 1 -1.57
+                children [
+                  Shape {
+                    appearance PBRAppearance { baseColor 0.1 0.1 0.1 roughness 1 }
+                    geometry Box { size 0.027 0.005 0.025 }
+                    contactMaterial "high_grip"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
     DEF EPUCK_LEFT_COLUMN Pose {
       translation 0.0254 0.0193 0.0426
       children [
@@ -1174,40 +1201,49 @@ Robot {
   %< } >%
   description "Educational robot designed at EPFL"
   boundingObject Group {
-    children [
-      Pose {
-        translation 0 0 0.025
-        rotation 1 0 0 3.141589
-        children [
-          Cylinder {
-            height 0.045
-            radius 0.037
-            subdivision 24
-          }
-        ]
-      }
-      Pose {
-        translation 0 0 0.0051
-        children [
-          Box {
-            size 0.05 0.04 0.01
-          }
-        ]
-      }
-      # 3. The Dribbler wings so they hit walls
-      # We translate them to match their position relative to the robot center
+    children [
+      # 1. Main Robot Body (Cylinder)
       Pose {
-        translation 0.068 -0.03 0.015  # Combined offset (0.038 + 0.03)
+        translation 0 0 0.025
+        rotation 1 0 0 3.14159
+        children [ Cylinder { height 0.045 radius 0.037 subdivision 24 } ]
+      }
+      # 2. Base Plate
+      Pose {
+        translation 0 0 0.0051
+        children [ Box { size 0.05 0.04 0.01 } ]
+      }
+      # 3. Right Wing (Shifted Back)
+      Pose {
+        # 0.02 (parent) + 0.02 (wing local) = 0.04
+        translation 0.04 -0.04 0.015
         rotation 0 0 1 -0.4
-        children [ USE WING_GEOM_R ]   # Reference the SHAPE, not the Transform
+        children [ Box { size 0.07 0.005 0.025 } ]
       }
+
+      # 4. RIGHT DOOR (Shifted Back)
       Pose {
-        translation 0.068 0.03 0.015   # Combined offset
-        rotation 0 0 1 0.4
-        children [ USE WING_GEOM_L ]   # Reference the SHAPE
+        # 0.04 (wing base) + 0.02 (rotated offset) = 0.06
+        translation 0.075 -0.04 0.015 
+        rotation 0 0 1 1.17 
+        children [ Box { size 0.022 0.006 0.025 } ]
       }
-    ]
-  }
+
+      # 5. Left Wing (Shifted Back)
+      Pose {
+        translation 0.04 0.04 0.015
+        rotation 0 0 1 0.4
+        children [ Box { size 0.07 0.005 0.025 } ]
+      }
+
+      # 6. LEFT DOOR (Shifted Back)
+      Pose {
+        translation 0.075 0.04 0.015 
+        rotation 0 0 1 -1.17 
+        children [ Box { size 0.022 0.006 0.025 } ]
+      }
+    ]
+  }
   %< if (!kinematic) { >%
     physics Physics {
       density -1

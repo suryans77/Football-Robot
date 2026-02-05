@@ -215,7 +215,7 @@ Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.025999999999999402 0.02
+        translation 0 0.025999999999999 0.02
         rotation 0 -1 0 6.060659478972105
         children [
           DEF EPUCK_WHEEL Pose {
@@ -368,7 +368,7 @@ Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.026000000000000585 0.02
+        translation 0 -0.026000000000000988 0.02
         rotation 0 -1 0 3.0407899173730173
         children [
           Pose {
@@ -1389,19 +1389,25 @@ Robot {
     damping Damping {
     }
   }
-  controller "goal_chaser"
+  controller "APF"
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
 }
-E-puckPlus {
-  translation 0.7 0.3 -0.000101003
+DEF defender2 E-puckPlus {
+  translation 0.3 0.3 -0.000101003
   rotation -1.9232986874095331e-10 -9.545405132879241e-10 -0.9999999999999999 -2.5086415598696536
   name "e-puck(1)"
+  controller "<none>"
+}
+DEF defender3 E-puckPlus {
+  translation 0.4 0 0
+  name "e-puck(2)"
 }
 SoccerBall {
   translation -0.23 0 0.021
 }
-E-puckPlus {
-  translation 0.1 -0.15 0.000254151
+DEF defender1 E-puckPlus {
+  translation 0 -0.1 0.000254151
   rotation -0.0025572185140550112 -0.05512870112833106 -0.9984759821574952 0.35631333465955284
+  controller "<none>"
 }

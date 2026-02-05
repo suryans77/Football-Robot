@@ -29,22 +29,23 @@ right_motor.setPosition(float('inf'))
 DEBUG = True
 
 # ================= PARAMETERS =================
-GOAL_POS = [-1.2, 0.0, 0.0]
+GOAL_POS = [1.2, 0.0, 0.0]
 
 OBSTACLES = [
-    [0.1, -0.15, 0.0],
-    [0.7, 0.3, 0.0]
+    [0.3, 0.3, 0.0],
+    [0.0, -0.1, 0.0],
+    [0.4, 0.0, 0.0]
 ]
 
 MAX_SPEED = 21.0
 DRIBBLE_SPEED = 10.0
 SEARCH_SPEED = 4.0
 IN_POCKET_LIMIT = 3500
-BALL_CLOSE_PIXELS = 400000
+BALL_CLOSE_PIXELS = 150000
 
-REPULSION_RADIUS = 0.3
-K_ATTRACT = 1.2
-K_REPEL = 0.2
+REPULSION_RADIUS = 0.5
+K_ATTRACT = 1.5
+K_REPEL = 0.5
 
 ESCAPE_GAIN = 0.6
 MIN_FORCE_THRESHOLD = 0.08
@@ -144,7 +145,7 @@ while robot.step(timestep) != -1:
     # ---- CONTROL ----
     if state == "NAVIGATE":
         fx, fy = calculate_apf_vector(curr_pos)
-        target_angle = math.atan2(fx, fy)
+        target_angle = math.atan2(fy, fx)
 
         angle_error = (target_angle - heading + math.pi) % (2*math.pi) - math.pi
 

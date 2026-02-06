@@ -43,10 +43,10 @@ PROTO SoccerBall [
       # FRICTION & BOUNCE SETTINGS
       # High coulombFriction (0.8) makes it "nudgeable" without sliding away like ice
       coulombFriction [
-        0.8
+        1.0
       ]
       # rollingFriction (0.1) provides resistance against the floor
-      rollingFriction 0.1
+      rollingFriction 0.2
       # restitution (0.1) makes the ball "dead" so it doesn't bounce off your robot
       restitution 0.1
     }

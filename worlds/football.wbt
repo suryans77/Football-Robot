@@ -190,8 +190,8 @@ Background {
   ]
 }
 Robot {
-  translation -0.7 -0.0558429 0.000444116
-  rotation -0.015981036607146015 0.004502382952512159 0.9998621580081477 2.802673189188564
+  translation -0.6973616698773496 -0.054298632427459886 -0.00011820519920484069
+  rotation -0.0014280467171314134 -0.0004887979492828246 0.9999988608789205 0.5421328915506984
   children [
     Compass {
     }
@@ -199,7 +199,7 @@ Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
-        position 8916.06247671604
+        position 8920.471515569692
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -215,8 +215,8 @@ Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.025999999999999 0.02
-        rotation 0 -1 0 6.060659478972105
+        translation 0 0.025999999999998573 0.02
+        rotation 0 -1 0 1.651620625320596
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -352,7 +352,7 @@ Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
-        position 9446.869912080725
+        position 9444.08480691565
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -368,8 +368,8 @@ Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.026000000000000988 0.02
-        rotation 0 -1 0 3.0407899173730173
+        translation 0 -0.026000000000001102 0.02
+        rotation 0 -1 0 5.825895082448964
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -1389,25 +1389,21 @@ Robot {
     damping Damping {
     }
   }
-  controller "APF"
+  controller "goal_chaser"
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
 }
 DEF defender2 E-puckPlus {
-  translation 0.3 0.3 -0.000101003
-  rotation -1.9232986874095331e-10 -9.545405132879241e-10 -0.9999999999999999 -2.5086415598696536
+  translation 0.29999999998647936 0.300000000009953 -0.00010100263007161488
+  rotation 3.864260192488693e-10 5.962853247799985e-10 1 2.5086415598696568
   name "e-puck(1)"
   controller "<none>"
 }
-DEF defender3 E-puckPlus {
-  translation 0.4 0 0
-  name "e-puck(2)"
+DEF defender1 E-puckPlus {
+  translation 7.94069e-05 -0.300015 -0.000101007
+  rotation 1.184533809865704e-07 3.571574355002386e-07 -0.9999999999999292 0.3553520245694542
+  controller "<none>"
 }
 SoccerBall {
-  translation -0.23 0 0.021
-}
-DEF defender1 E-puckPlus {
-  translation 0 -0.1 0.000254151
-  rotation -0.0025572185140550112 -0.05512870112833106 -0.9984759821574952 0.35631333465955284
-  controller "<none>"
+  translation -0.25 0 0.021
 }

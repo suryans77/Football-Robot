@@ -32,17 +32,15 @@ GOAL_POS = [-1.20, 0.0]
 MAX_SPEED       = 21.0
 DRIBBLE_SPEED   = 10.0
 SEARCH_SPEED    = 4.0
-IN_POCKET_LIMIT = 10
 smoothed_heading = 0.0
 CAPTURE_PIXEL_THRESHOLD = 350000
+RELEASE_PIXEL_THRESHOLD = 300000  # Low bar to stay in GO_TO_GOAL
 
 LOWER_ORANGE = np.array([0, 150, 50])
 UPPER_ORANGE = np.array([20, 255, 255])
 
 # ------------------ NAVIGATION HELPERS ------------------
 def get_robot_heading(compass_values):
-    # Webots Compass returns a vector. atan2(y, x) gives the angle.
-    # If the robot circles the goal instead of hitting it, swap to (cv[0], cv[1])
     return math.atan2(compass_values[0], compass_values[1])
 
 # ------------------ MAIN LOOP ------------------
@@ -75,7 +73,10 @@ while robot.step(timestep) != -1:
 
     # 2. Pixel-Based State Logic
     ball_visible = pixels_found > 100
-    is_in_pocket = pixels_found > CAPTURE_PIXEL_THRESHOLD
+    if state == "GO_TO_GOAL":
+        is_in_pocket = pixels_found > RELEASE_PIXEL_THRESHOLD
+    else:
+        is_in_pocket = pixels_found > CAPTURE_PIXEL_THRESHOLD
 
     if is_in_pocket:
         state = "GO_TO_GOAL"
@@ -108,7 +109,7 @@ while robot.step(timestep) != -1:
         # 2. Check if curr_pos is changing as the robot moves
         # 3. Check if My_Deg changes when the robot rotates
         dist = math.sqrt(dx**2 + dy**2)
-        print(f"Pixels: {pixels_found:.0f} | PS0: {ps0.getValue():.0f}")
+        print(f"Pixels: {pixels_found:.0f} ")
         print(f"STATE: {state} | Goal: {GOAL_POS} | Curr_Pos: [{curr_pos[0]:.2f}, {curr_pos[1]:.2f}]")
         print(f"Target_Deg: {math.degrees(target_angle):.1f} | My_Deg: {math.degrees(heading):.1f} | Dist: {dist:.2f}m")
         print("-" * 30)

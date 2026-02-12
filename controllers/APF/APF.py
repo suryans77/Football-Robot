@@ -10,6 +10,7 @@ timestep = int(robot.getBasicTimeStep())
 # Supervisor handles for defenders
 def1 = robot.getFromDef("defender1")
 def2 = robot.getFromDef("defender2")
+def3 = robot.getFromDef("defender3") # Optional third defender, can be None
 
 # Standard devices
 gps = robot.getDevice("gps")
@@ -89,6 +90,9 @@ def update_vrf(curr_pos):
     if def2 is not None:
         p2 = def2.getPosition()[:2]
         dynamic_obstacles.append(p2)
+    if def3 is not None:
+        p3 = def3.getPosition()[:2]
+        dynamic_obstacles.append(p3)
     
     # Project obstacles onto VRF beams
     for obs in dynamic_obstacles:

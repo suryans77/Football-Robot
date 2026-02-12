@@ -43,13 +43,13 @@ MAX_RANGE = 2.0
 VRF_SENSORS = [MAX_RANGE] * NUM_BEAMS
 
 # APF Gains
-K_ATTRACT = 1.5
+K_ATTRACT = 2.0
 K_REPEL = 0.8
-REPULSION_RADIUS = 0.3
+REPULSION_RADIUS = 0.5
 
 # Speed Parameters
 MAX_SPEED = 21.0
-DRIBBLE_SPEED = 10.0  # Reduced from 10.0 for better ball control
+DRIBBLE_SPEED = 8.0  # Reduced from 10.0 for better ball control
 APPROACH_SPEED = 10.0
 SEARCH_SPEED = 4.0
 
@@ -216,7 +216,7 @@ while robot.step(timestep) != -1:
         
         # GENTLE TURNING STRATEGY
         # Calculate turn command with limit
-        turn_gain = 8.0
+        turn_gain = 6.0
         turn = max(min(angle_error * turn_gain, MAX_TURN_RATE), -MAX_TURN_RATE)
         
         # Slow down based on how much we're turning

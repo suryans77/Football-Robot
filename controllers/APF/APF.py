@@ -46,6 +46,7 @@ VRF_SENSORS = [MAX_RANGE] * NUM_BEAMS
 # APF Gains
 K_ATTRACT = 2.0
 K_REPEL = 0.8
+TANGENT_STRENGTH = 1.25
 REPULSION_RADIUS = 0.5
 
 # Speed Parameters
@@ -126,6 +127,19 @@ def calculate_apf_force(curr_pos):
             
             fx -= math.cos(angle) * repel_mag
             fy -= math.sin(angle) * repel_mag
+
+            # TANGENT FORCE (Sliding around obstacle)
+            # Rotate repulsion vector by 90 degrees: x' = -y, y' = x
+            tx = -math.sin(angle) * repel_mag
+            ty = math.cos(angle) * repel_mag
+            
+            # Use dot product to choose the side pointing toward the goal
+            # (tangent_vector · goal_vector)
+            if (tx * dx_g + ty * dy_g) < 0:
+                tx, ty = -tx, -ty
+            
+            fx += tx * TANGENT_STRENGTH
+            fy += ty * TANGENT_STRENGTH
     
     # 3. Escape Mechanism
     force_mag = math.hypot(fx, fy)

@@ -24,8 +24,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation 0.3959036852931975 -0.7798399094184074 -0.484881416069491 4.788885079858133
-  position -1.1299807288058403 -0.9421954943438392 4.1471111157212865
+  orientation 0.34344219279217036 -0.7357181296260625 -0.5837519113027674 5.080524389799089
+  position -1.9718762632632585 -1.6874560741312399 3.034785026205731
 }
 RectangleArena {
   floorSize 2.625 1.7
@@ -74,6 +74,9 @@ DEF left_post_1 Solid {
       }
     }
   ]
+  boundingObject Box {
+    size 0.1 0.01 0.3
+  }
 }
 DEF right_post_1 Solid {
   translation 1.27 -0.2 0
@@ -85,6 +88,9 @@ DEF right_post_1 Solid {
     }
   ]
   name "solid(1)"
+  boundingObject Box {
+    size 0.1 0.01 0.3
+  }
 }
 DEF cross_bar_1 Solid {
   translation 1.27 0 0.15
@@ -118,6 +124,9 @@ DEF left_post_2 Solid {
     }
   ]
   name "solid(4)"
+  boundingObject Box {
+    size 0.1 0.01 0.3
+  }
 }
 DEF right_post_2 Solid {
   translation -1.27 -0.2 0
@@ -129,6 +138,9 @@ DEF right_post_2 Solid {
     }
   ]
   name "solid(5)"
+  boundingObject Box {
+    size 0.1 0.01 0.3
+  }
 }
 DEF cross_bar_2 Solid {
   translation -1.27 0 0.15
@@ -189,9 +201,19 @@ Background {
     1 1 1
   ]
 }
-Robot {
-  translation -0.7362122945009161 0.039886210213582345 -0.00010101155756919722
-  rotation -0.0001796119938773263 -0.00030977439145615554 -0.999999935889677 0.027047307344458198
+DEF defender1 E-puckPlus {
+  hidden rotation_1 0 1 0 5.16191365590357e-08
+  hidden rotation_2 0 1 0 5.16191365590357e-08
+  translation -1.2555699999609544 -0.04278120001447379 -0.00010100263007805765
+  rotation 3.4682478460723463e-09 -1.6051177458688578e-09 -1 0.3550058491419236
+  controller "<none>"
+}
+DEF Ball SoccerBall {
+  translation -0.526495 0.00750429 0.0288462
+}
+DEF striker Robot {
+  translation -0.72 -1.501e-11 -0.000109745
+  rotation 0.6757921215986357 0.7370132020537541 0.01079575767081996 1.8519145614454984e-09
   children [
     Compass {
     }
@@ -199,7 +221,7 @@ Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
-        position 9023.366117576441
+        position -4.6006073617377297e-08
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -215,8 +237,8 @@ Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.025999999999997 0.02
-        rotation 0 1 0 0.7120164665547755
+        translation 0 0.02600000000000106 0.02
+        rotation 0 -1 0 4.2146848510894035e-08
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -346,13 +368,13 @@ Robot {
         }
         physics DEF EPUCK_WHEEL_PHYSICS Physics {
           density -1
-          mass 0.005
+          mass 0.05
         }
       }
     }
     HingeJoint {
       jointParameters HingeJointParameters {
-        position 9587.589747726273
+        position -4.600605463283746e-08
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -368,8 +390,8 @@ Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.025999999999999805 0.02
-        rotation 0 -0.9999999999999999 0 0.5510310297756192
+        translation 0 -0.02600000000000106 0.02
+        rotation 0 -1 0 4.2146848510894035e-08
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -1314,7 +1336,7 @@ Robot {
       translation 0.03 0 0.0003
     }
   ]
-  name "striker"
+  name "e-puck(3)"
   model "GCtronic e-puck"
   description "Educational robot designed at EPFL"
   boundingObject Group {
@@ -1382,28 +1404,15 @@ Robot {
     centerOfMass [
       0 0 0.005
     ]
-    inertiaMatrix [
-      9.78585e-05 8.64333e-05 8.74869e-05
-      0 0 0
-    ]
     damping Damping {
     }
   }
-  controller "APF"
+  controller "keyboard"
   supervisor TRUE
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
 }
-DEF defender1 E-puckPlus {
-  translation -1.25557 -0.0427812 -0.000101003
-  rotation 3.804389464297521e-09 2.6865634522972526e-10 -1 0.3550058491419183
-  controller "<none>"
-}
-DEF Ball SoccerBall {
-  translation -0.34502 0.0214726 0.020964683999999997
-}
 DEF defender2 Robot {
-  translation 0.2 0 0
   children [
     Compass {
     }
@@ -1427,6 +1436,7 @@ DEF defender2 Robot {
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
         translation 0 0.026 0.02
+        rotation 0 1 0 0
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -1556,7 +1566,7 @@ DEF defender2 Robot {
         }
         physics DEF EPUCK_WHEEL_PHYSICS Physics {
           density -1
-          mass 0.005
+          mass 0.05
         }
       }
     }
@@ -1578,6 +1588,7 @@ DEF defender2 Robot {
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
         translation 0 -0.026 0.02
+        rotation 0 1 0 0
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -2590,23 +2601,20 @@ DEF defender2 Robot {
     centerOfMass [
       0 0 0.005
     ]
-    inertiaMatrix [
-      9.78585e-05 8.64333e-05 8.74869e-05
-      0 0 0
-    ]
     damping Damping {
     }
   }
   controller "type-1"
+  supervisor TRUE
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
 }
 DEF defender3 Robot {
-  translation 0.7 0 0
+  translation 0.6 0 0
   children [
-    GPS {
-    }
     Compass {
+    }
+    GPS {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
@@ -2626,6 +2634,7 @@ DEF defender3 Robot {
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
         translation 0 0.026 0.02
+        rotation 0 1 0 0
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -2755,7 +2764,7 @@ DEF defender3 Robot {
         }
         physics DEF EPUCK_WHEEL_PHYSICS Physics {
           density -1
-          mass 0.005
+          mass 0.05
         }
       }
     }
@@ -2777,6 +2786,7 @@ DEF defender3 Robot {
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
         translation 0 -0.026 0.02
+        rotation 0 1 0 0
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -3789,14 +3799,11 @@ DEF defender3 Robot {
     centerOfMass [
       0 0 0.005
     ]
-    inertiaMatrix [
-      9.78585e-05 8.64333e-05 8.74869e-05
-      0 0 0
-    ]
     damping Damping {
     }
   }
   controller "type-2"
+  supervisor TRUE
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
 }

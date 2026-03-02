@@ -196,7 +196,7 @@ Robot {
         %< if (!kinematic) { >%
           physics DEF EPUCK_WHEEL_PHYSICS Physics {
             density -1
-            mass 0.005
+            mass 0.05
           }
         %< } >%
       }
@@ -1249,7 +1249,6 @@ Robot {
       density -1
     mass 0.5
     centerOfMass [0 0 0.005]
-    inertiaMatrix [9.78585e-05 8.64333e-05 8.74869e-05, 0 0 0]
 
     damping Damping {
         linear 0.2    # Dampens forward/backward jitter [0 to 1]

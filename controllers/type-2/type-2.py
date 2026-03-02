@@ -18,17 +18,17 @@ right_motor.setPosition(float('inf'))
 ball_node = robot.getFromDef("Ball")
 
 # --- GAME PARAMETERS ---
-MY_GOAL_CENTER = [1.2, 0.0]  # The anchor point (center of your net)
-MAX_RANGE_FROM_GOAL = 0.5    # The "Leash" length 
+MY_GOAL_CENTER = [1.2, 0.0]  
+DEFENSE_RADIUS = 0.5 
 
 # --- MOVEMENT PARAMETERS ---
-MAX_SPEED = 5.0
-BLOCKING_SPEED = 3.0
+MAX_SPEED = 21.0       # Upgraded to your custom e-puck max
+BLOCKING_SPEED = 12.0
 
-# PID Steering Constants
+# PD Steering Constants
 Kp = 5.0
-Kd = 2.0
-prev_error = 0
+Kd = 1.5               # Added damping to prevent wobbling
+prev_error = 0.0
 
 while robot.step(timestep) != -1:
     if ball_node is None: continue
@@ -40,65 +40,66 @@ while robot.step(timestep) != -1:
     my_heading = math.atan2(compass_val[0], compass_val[1])
 
     # --- STRATEGY: CALCULATE IDEAL BLOCKING SPOT ---
-    
-    # 1. Get Vector from Goal to Ball
     vec_x = ball_pos[0] - MY_GOAL_CENTER[0]
     vec_y = ball_pos[1] - MY_GOAL_CENTER[1]
-    
-    # 2. Normalize Vector (Direction only)
     dist_goal_to_ball = math.hypot(vec_x, vec_y)
     
-    # Safety check to avoid divide by zero
     if dist_goal_to_ball < 0.001:
         unit_x, unit_y = 1.0, 0.0
     else:
         unit_x = vec_x / dist_goal_to_ball
         unit_y = vec_y / dist_goal_to_ball
+    
+    target_x = MY_GOAL_CENTER[0] + (unit_x * DEFENSE_RADIUS)
+    target_y = MY_GOAL_CENTER[1] + (unit_y * DEFENSE_RADIUS)
 
-    # 3. Determine Unclamped Target
-    # Ideally, we want to be half the distance to the ball, 
-    # OR at our max range, whichever is closer.
-    
-    # "Shadow" distance: Try to stay 0.5m in front of the goal to block
-    desired_dist = 0.5 
-    
-    # 4. APPLY THE LEASH (The Constraint)
-    # If the ball is further than our leash, we stay at MAX_RANGE.
-    # If the ball comes inside our range, we meet it.
-    
-    final_dist = min(desired_dist, MAX_RANGE_FROM_GOAL)
-    
-    # Calculate the exact coordinate on the circle
-    target_x = MY_GOAL_CENTER[0] + (unit_x * final_dist)
-    target_y = MY_GOAL_CENTER[1] + (unit_y * final_dist)
-
-    # --- NAVIGATION: DRIVE TO TARGET ---
+    # --- NAVIGATION & KINEMATICS ---
     dx = target_x - curr_pos[0]
     dy = target_y - curr_pos[1]
     dist_to_target = math.hypot(dx, dy)
-    target_angle = math.atan2(dy, dx)
+    
+    # 1. Determine Target Angle and Base Speed
+    if dist_to_target < 0.05:
+        # ACTIVE WAITING: On the spot, face the ball.
+        base_speed = 0.0
+        target_angle = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
+    else:
+        # DRIVING: Uncap the speed!
+        target_angle = math.atan2(dy, dx)
+        
+        # LATE BRAKING: Go absolute MAX_SPEED until we are 15cm away, then brake hard.
+        if dist_to_target > 0.15:
+            base_speed = MAX_SPEED
+        else:
+            base_speed = MAX_SPEED * (dist_to_target / 0.15)
+            # Ensure it doesn't drop so low that it stalls before reaching the point
+            base_speed = max(base_speed, 5.0) 
 
-    # PID Steering
+    # 2. PD Steering
     angle_error = target_angle - my_heading
     while angle_error > math.pi: angle_error -= 2 * math.pi
     while angle_error < -math.pi: angle_error += 2 * math.pi
 
-    error_rate = (angle_error - prev_error)
+    error_rate = angle_error - prev_error
     turn_amount = (Kp * angle_error) + (Kd * error_rate)
-    prev_error = angle_error
+    prev_error = angle_error 
     
-    # Motor Speed Mixing
-    left_speed = BLOCKING_SPEED - turn_amount
-    right_speed = BLOCKING_SPEED + turn_amount
+    # 3. FORGIVING PIVOT LOGIC
+    # If the error is small (under ~28 degrees / 0.5 rads), don't slow down at all.
+    # This allows it to smoothly ride the arc without stuttering.
+    if abs(angle_error) < 0.5:
+        speed_multiplier = 1.0
+    else:
+        speed_multiplier = max(0.0, 1.0 - (abs(angle_error) / (math.pi / 2)))
+        
+    current_base_speed = base_speed * speed_multiplier
     
-    # Clamp
+    # 4. Motor Mixing & Clamping
+    left_speed = current_base_speed - turn_amount
+    right_speed = current_base_speed + turn_amount
+    
     left_speed = max(min(left_speed, MAX_SPEED), -MAX_SPEED)
     right_speed = max(min(right_speed, MAX_SPEED), -MAX_SPEED)
-
-    # Jitter Prevention (Stop if we are at the spot)
-    if dist_to_target < 0.05:
-        left_speed = 0
-        right_speed = 0
 
     left_motor.setVelocity(left_speed)
     right_motor.setVelocity(right_speed)

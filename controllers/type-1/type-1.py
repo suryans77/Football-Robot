@@ -17,19 +17,16 @@ right_motor.setPosition(float('inf'))
 
 ball_node = robot.getFromDef("Ball")
 
-# --- GAME PARAMETERS ---
-MY_GOAL_CENTER = [1.2, 0.0]   # Coordinate of YOUR goal
-STOP_DEFENDING_DIST = 1.0   # Stop if ball is closer than 1.0m to goal
-
 # --- MOVEMENT PARAMETERS ---
-MAX_SPEED = 8.0
-JOCKEY_SPEED = 4.0 
-JOCKEY_DIS = 0.5    # Distance to switch from Sprint to Jockey
+MAX_SPEED = 15.0
+JOCKEY_DIS = 0.5              # Distance to switch from Sprint to Controlled Ram
 
-# PID Steering Constants
-Kp = 8.0
-Kd = 3.0
-prev_error = 0
+# Steering Constants
+# PD Steering Constants
+Kp = 8.0  # Your original K value
+Kd = 2.0  # The new damping value (start small and tune!)
+
+prev_error = 0.0 # Initialize outside the loop
 
 while robot.step(timestep) != -1:
     if ball_node is None: continue
@@ -38,65 +35,48 @@ while robot.step(timestep) != -1:
     curr_pos = gps.getValues()
     ball_pos = ball_node.getPosition()
     compass_val = compass.getValues()
+    
+    # Calculate heading
     my_heading = math.atan2(compass_val[0], compass_val[1])
 
-    # --- ZONE CHECK: IS THE BALL TOO CLOSE TO MY GOAL? ---
-    # Calculate distance between Ball and My Goal
-    dx_goal = ball_pos[0] - MY_GOAL_CENTER[0]
-    dy_goal = ball_pos[1] - MY_GOAL_CENTER[1]
-    dist_ball_to_goal = math.hypot(dx_goal, dy_goal)
-
-    # DEFAULT: We assume we should defend
-    should_defend = True
-
-    # If ball is deep in our zone (closer than 1.0m), STOP defending
-    if dist_ball_to_goal < STOP_DEFENDING_DIST:
-        should_defend = False
+    # --- BEHAVIOR LOGIC: RELENTLESS PURSUIT ---
+    # Always calculate vector to the ball
+    dx = ball_pos[0] - curr_pos[0]
+    dy = ball_pos[1] - curr_pos[1]
+    dist_to_ball = math.hypot(dx, dy)
+    target_angle = math.atan2(dy, dx)
     
-    # --- BEHAVIOR LOGIC ---
-    
-    if should_defend:
-        # === NORMAL HARASSER LOGIC ===
-        
-        # Calculate target (Ball)
-        dx = ball_pos[0] - curr_pos[0]
-        dy = ball_pos[1] - curr_pos[1]
-        dist_to_ball = math.hypot(dx, dy)
-        target_angle = math.atan2(dy, dx)
-        
-        # Determine Speed (Sprint vs Jockey)
-        if dist_to_ball > JOCKEY_DIS:
-            base_speed = MAX_SPEED
-        else:
-            base_speed = JOCKEY_SPEED
-            
+    # TACTICAL RAMMING: Scale speed down slightly for steering control, but never stop.
+    if dist_to_ball > JOCKEY_DIS:
+        base_speed = MAX_SPEED
     else:
-        # === STOP / BACK OFF LOGIC ===
-        # The ball is too close to goal. Let the goalie handle it.
-        # We stop moving to avoid overcrowding.
-        base_speed = 0.0
-        target_angle = my_heading # Don't try to turn, just freeze
-        
-        # OPTIONAL: You could make it retreat to a holding spot here instead
-        # e.g., target_x = -0.5, target_y = 0.5 (Midfield)
+        # Scale down to a minimum of 50% max speed. 
+        # Ensures a hard hit, but keeps enough traction to track evasions.
+        speed_ratio = dist_to_ball / JOCKEY_DIS
+        base_speed = max(MAX_SPEED * 0.5, MAX_SPEED * speed_ratio)
 
-    # --- STEERING CONTROL (PID) ---
+    # --- STEERING CONTROL (PID & KINEMATICS) ---
     angle_error = target_angle - my_heading
+    
+    # Normalize angle error between -pi and pi
     while angle_error > math.pi: angle_error -= 2 * math.pi
     while angle_error < -math.pi: angle_error += 2 * math.pi
 
-    error_rate = (angle_error - prev_error)
+    error_rate = angle_error - prev_error
     turn_amount = (Kp * angle_error) + (Kd * error_rate)
+    
+    # Save the current error for the next frame
     prev_error = angle_error
 
-    # If we are stopped, turn_amount should also be zero
-    if base_speed == 0:
-        turn_amount = 0
+    # PIVOT LOGIC: Slow down forward speed if we need to turn sharply.
+    # If the ball is behind the robot, speed_multiplier drops to 0, causing it to spin in place first.
+    speed_multiplier = max(0.0, 1.0 - (abs(angle_error) / (math.pi / 2))) 
+    current_base_speed = base_speed * speed_multiplier
 
-    left_speed = base_speed - turn_amount
-    right_speed = base_speed + turn_amount
+    left_speed = current_base_speed - turn_amount
+    right_speed = current_base_speed + turn_amount
     
-    # Clamp
+    # Clamp velocities to the motor limits to prevent Webots warnings/errors
     left_speed = max(min(left_speed, MAX_SPEED), -MAX_SPEED)
     right_speed = max(min(right_speed, MAX_SPEED), -MAX_SPEED)
 

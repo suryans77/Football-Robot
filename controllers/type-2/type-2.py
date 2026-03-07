@@ -18,7 +18,7 @@ right_motor.setPosition(float('inf'))
 ball_node = robot.getFromDef("Ball")
 
 # --- GAME PARAMETERS ---
-MY_GOAL_CENTER = [1.5, 0.0]  
+MY_GOAL_CENTER = [2.0, 0.0]  
 DEFENSE_RADIUS = 0.6  # Distance from goal center to position the defender (tune as needed) 
 
 # --- MOVEMENT PARAMETERS ---

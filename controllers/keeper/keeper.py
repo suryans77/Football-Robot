@@ -17,14 +17,14 @@ right_motor.setPosition(float('inf'))
 ball_node = robot.getFromDef("Ball")
 
 # --- KEEPER PARAMETERS ---
-GOAL_CENTER    = [1.5, 0.0]
+GOAL_CENTER    = [2.0, 0.0]
 GOAL_Y_LIMIT   = 0.25
 KEEPER_RADIUS  = 0.1   # Pushed out further — gives more reaction space
 SHOT_THRESHOLD = 1.5    # Lower = reacts to slower shots too
 
 # --- MOVEMENT PARAMETERS ---
-NORMAL_SPEED = 15.0
-DASH_SPEED   = 21.0
+SPEED = 20.0
+
 
 # Steering
 Kp = 8.0
@@ -110,7 +110,7 @@ while robot.step(timestep) != -1:
         target_angle = ball_angle
     else:
         if is_shot_incoming:
-            base_speed   = DASH_SPEED
+            base_speed   = SPEED
             target_angle = target_drive_angle  # Full speed, steer to intercept
         else:
             # Blend heading: face target while moving, rotate to ball on arrival
@@ -118,9 +118,9 @@ while robot.step(timestep) != -1:
             target_angle = ball_angle + blend * (target_drive_angle - ball_angle)
 
             if dist_to_target > 0.1:
-                base_speed = NORMAL_SPEED
+                base_speed = SPEED
             else:
-                base_speed = max(4.0, NORMAL_SPEED * (dist_to_target / 0.1))
+                base_speed = max(4.0, SPEED * (dist_to_target / 0.1))
 
     # --- PD STEERING ---
     angle_error = target_angle - my_heading
@@ -147,8 +147,8 @@ while robot.step(timestep) != -1:
         base_speed_curr += (current_base_speed - base_speed_curr) * ACCEL
         turn_curr       += (turn_amount - turn_curr) * ACCEL
 
-    left_speed  = max(min(base_speed_curr - turn_curr, DASH_SPEED), -DASH_SPEED)
-    right_speed = max(min(base_speed_curr + turn_curr, DASH_SPEED), -DASH_SPEED)
+    left_speed  = max(min(base_speed_curr - turn_curr, SPEED), -SPEED)
+    right_speed = max(min(base_speed_curr + turn_curr, SPEED), -SPEED)
 
     left_motor.setVelocity(left_speed)
     right_motor.setVelocity(right_speed)

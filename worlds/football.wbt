@@ -24,10 +24,10 @@ WorldInfo {
 }
 Viewpoint {
   orientation 0.38005364760611526 -0.6896273918904078 -0.6164197314295842 4.953646596539156
-  position -1.4675604199016865 -1.5734580036135362 3.3342862839100165
+  position -1.5578635842848603 -1.676765646150073 3.553784474363565
 }
 RectangleArena {
-  floorSize 3.2 2.1
+  floorSize 4.2 2.75
   floorAppearance PBRAppearance {
     baseColor 0.333333 1 0
     baseColorMap ImageTexture {
@@ -65,7 +65,7 @@ RectangleArena {
   }
 }
 DEF left_post_1 Solid {
-  translation 1.55 0.25 0
+  translation 2.05 0.25 0
   children [
     Shape {
       geometry Box {
@@ -78,7 +78,7 @@ DEF left_post_1 Solid {
   }
 }
 DEF right_post_1 Solid {
-  translation 1.55 -0.25 0
+  translation 2.05 -0.25 0
   children [
     Shape {
       geometry Box {
@@ -92,7 +92,7 @@ DEF right_post_1 Solid {
   }
 }
 DEF cross_bar_1 Solid {
-  translation 1.55 0 0.15
+  translation 2.05 0 0.15
   children [
     Shape {
       geometry Box {
@@ -103,18 +103,18 @@ DEF cross_bar_1 Solid {
   name "solid(2)"
 }
 DEF goal_line_1 Solid {
-  translation 1.5 0 0
+  translation 2 0 0
   children [
     Shape {
       geometry Box {
-        size 0.01 1.96 0.001
+        size 0.01 2.6 0.001
       }
     }
   ]
   name "solid(3)"
 }
 DEF left_post_2 Solid {
-  translation -1.55 0.25 0
+  translation -2.05 0.25 0
   children [
     Shape {
       geometry Box {
@@ -128,7 +128,7 @@ DEF left_post_2 Solid {
   }
 }
 DEF right_post_2 Solid {
-  translation -1.55 -0.25 0
+  translation -2.05 -0.25 0
   children [
     Shape {
       geometry Box {
@@ -142,7 +142,7 @@ DEF right_post_2 Solid {
   }
 }
 DEF cross_bar_2 Solid {
-  translation -1.55 0 0.15
+  translation -2.05 0 0.15
   children [
     Shape {
       geometry Box {
@@ -153,11 +153,11 @@ DEF cross_bar_2 Solid {
   name "solid(6)"
 }
 DEF goal_line_2 Solid {
-  translation -1.5 0 0
+  translation -2 0 0
   children [
     Shape {
       geometry Box {
-        size 0.01 1.96 0.001
+        size 0.01 2.6 0.001
       }
     }
   ]
@@ -167,29 +167,29 @@ DEF centre_line Solid {
   children [
     Shape {
       geometry Box {
-        size 0.01 1.96 0.001
+        size 0.01 2.6 0.001
       }
     }
   ]
   name "solid(8)"
 }
 DEF left_touchline Solid {
-  translation 0 0.96 0
+  translation 0 1.3 0
   children [
     Shape {
       geometry Box {
-        size 3 0.01 0.01
+        size 4 0.01 0.01
       }
     }
   ]
   name "solid(9)"
 }
 DEF right_touchline Solid {
-  translation 0 -0.98 0
+  translation 0 -1.3 0
   children [
     Shape {
       geometry Box {
-        size 3 0.01 0.01
+        size 4 0.01 0.01
       }
     }
   ]
@@ -1428,7 +1428,7 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.02600000000001094 0.02
+        translation 0 0.026000000000013717 0.02
         rotation 0 -1 0 4.2146848510894035e-08
         children [
           DEF EPUCK_WHEEL Pose {
@@ -1581,7 +1581,7 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.02600000000001094 0.02
+        translation 0 -0.026000000000013717 0.02
         rotation 0 -1 0 4.2146848510894035e-08
         children [
           Pose {

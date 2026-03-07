@@ -18,7 +18,7 @@ right_motor.setPosition(float('inf'))
 ball_node = robot.getFromDef("Ball")
 
 # --- GAME PARAMETERS ---
-MY_GOAL_CENTER = [1.5, 0.0]  
+MY_GOAL_CENTER = [2.0, 0.0]  
 MARKING_DIST = 0.3     # The distance to maintain from the attacker in the 1.0-1.5m zone
 
 # --- MOVEMENT PARAMETERS ---
@@ -58,73 +58,77 @@ while robot.step(timestep) != -1:
     # --- BEHAVIOR STATE MACHINE ---
     is_chasing = False
 
-    if dist_goal_to_ball < 1.25:
-        # STATE 1: PURE CHASING (Breached the 1.0m line)
-        # Abandon spacing, target the ball directly for a tackle.
+    if dist_goal_to_ball < 1.5 and ball_pos[0] > curr_pos[0]:
         target_x = ball_pos[0]
         target_y = ball_pos[1]
         is_chasing = True
 
-    elif dist_goal_to_ball <= 2.5:
-        # STATE 2: MAN-MARKING (Between 1.0m and 1.5m)
-        # Stay exactly MARKING_DIST away from the ball, on the direct line to the goal.
+    elif dist_goal_to_ball < 2.0:
+        # STATE 2: LATERAL CONTAINMENT (The Wall)
+        # Anchor the depth 1.0m away from the goal center.
+        # Purely mirror the Y movement to slide laterally and block the lane.
+        target_x = ball_pos[0] + 0.3  
+        target_y = ball_pos[1]
+
+    elif dist_goal_to_ball <= 3.0:
+        # STATE 3: MAN-MARKING 
+        # Stay exactly MARKING_DIST away from the ball.
         target_x = ball_pos[0] + (dir_bg_x * MARKING_DIST)
         target_y = ball_pos[1] + (dir_bg_y * MARKING_DIST)
 
     else:
-        # STATE 3: HOLD THE LINE (Further than 1.5m)
-        # Wait at the edge of the 1.5m defensive zone, staying between the ball and goal.
-        target_x = MY_GOAL_CENTER[0] - (dir_bg_x * 1.5)
-        target_y = MY_GOAL_CENTER[1] - (dir_bg_y * 1.5)
+        # STATE 4: HOLD THE LINE 
+        # Wait at the edge of the 1.5m defensive zone.
+        target_x = MY_GOAL_CENTER[0] - (dir_bg_x * 2.5)
+        target_y = MY_GOAL_CENTER[1] - (dir_bg_y * 2.5)
 
     # --- NAVIGATION & KINEMATICS ---
     dx = target_x - curr_pos[0]
     dy = target_y - curr_pos[1]
     dist_to_target = math.hypot(dx, dy)
 
-    # How misaligned is our target vs where we're facing the ball?
-    # When target is far off-axis, steer toward TARGET first, then ball when close
-    ball_angle = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
-    target_drive_angle = math.atan2(dy, dx)
+    angle_to_spot = math.atan2(dy, dx)
+    angle_to_ball = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
 
-    # Blend: prioritize driving to target when far, face ball when arrived
-    # blend=1.0 → steer to target, blend=0.0 → face ball
-    if dist_to_target > 0.05:
-        blend = min(1.0, dist_to_target / 0.3)  # tune 0.3 to taste
-    else:
-        blend = 0.0
-
-    target_angle = ball_angle + blend * (target_drive_angle - ball_angle)
-
-    # Normalize target_angle
-    if target_angle > math.pi: target_angle -= 2 * math.pi
-    if target_angle < -math.pi: target_angle += 2 * math.pi
-
-    # Speed: no longer suppressed by projection, just use dist directly
-    if not is_chasing and dist_to_target < 0.05:
-        base_speed = 0.0
-    elif dist_to_target > 0.15:
+    # === HYBRID BEHAVIOR CORE LOGIC ===
+    if dist_to_target > 0.25 or is_chasing:
+        # 1. RECOVERY SPRINT: We are out of position or tackling!
+        # Stop looking at the ball. Look exactly at the waypoint and drive there fast.
+        target_angle = angle_to_spot
         base_speed = MAX_SPEED
+            
     else:
-        if is_chasing:
-            base_speed = max(MAX_SPEED * 0.5, MAX_SPEED * (dist_to_target / 0.15))
+        # 2. JOCKEY MODE: We are in the pocket!
+        # Lock eyes on the ball and use forward/reverse to hold the gap.
+        target_angle = angle_to_ball
+        
+        if dist_to_target < 0.05:
+            base_speed = 0.0
         else:
-            base_speed = max(5.0, MAX_SPEED * (dist_to_target / 0.15))
+            speed_mag = MAX_SPEED * (dist_to_target / 0.15)
+            speed_mag = max(speed_mag, 5.0)
+            
+            # REVERSE GEAR CHECK
+            angle_diff = angle_to_spot - my_heading
+            while angle_diff > math.pi: angle_diff -= 2 * math.pi
+            while angle_diff < -math.pi: angle_diff += 2 * math.pi
+            
+            if abs(angle_diff) > (math.pi / 2):
+                base_speed = -speed_mag # Target is behind, backpedal!
+            else:
+                base_speed = speed_mag  # Target is in front, step up!
 
-    # Remove the forward_component suppression entirely
-    # The blend above handles steering, speed is purely distance-based
-
-    # 2. PD Steering
+    # --- PD STEERING ---
     angle_error = target_angle - my_heading
-    if angle_error > math.pi: angle_error -= 2 * math.pi
-    if angle_error < -math.pi: angle_error += 2 * math.pi
+    while angle_error > math.pi: angle_error -= 2 * math.pi
+    while angle_error < -math.pi: angle_error += 2 * math.pi
 
     error_rate = angle_error - prev_error
     turn_amount = (Kp * angle_error) + (Kd * error_rate)
     turn_amount = max(min(turn_amount, MAX_TURN), -MAX_TURN)  
     prev_error = angle_error 
     
-    # 3. Forgiving Pivot Logic
+    # Forgiving Pivot Logic (Brakes if we need to make a sharp turn)
     if abs(angle_error) < 0.5:
         speed_multiplier = 1.0
     else:
@@ -132,10 +136,12 @@ while robot.step(timestep) != -1:
         
     current_base_speed = base_speed * speed_multiplier
     
-    # 4. Motor Mixing & Smoothing
+    # --- MOTOR MIXING & SMOOTHING ---
     base_speed_curr += (current_base_speed - base_speed_curr) * ACCEL
     turn_curr += (turn_amount - turn_curr) * ACCEL
 
+    # Because base_speed correctly flips to negative in the logic above, 
+    # standard mixing works perfectly without breaking the steering!
     left_speed = base_speed_curr - turn_curr
     right_speed = base_speed_curr + turn_curr
     

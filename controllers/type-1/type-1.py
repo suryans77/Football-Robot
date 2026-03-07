@@ -19,7 +19,7 @@ ball_node = robot.getFromDef("Ball")
 
 # --- GAME PARAMETERS ---
 MY_GOAL_CENTER = [1.5, 0.0]  
-MARKING_DIST = 0.2     # The distance to maintain from the attacker in the 1.0-1.5m zone
+MARKING_DIST = 0.3     # The distance to maintain from the attacker in the 1.0-1.5m zone
 
 # --- MOVEMENT PARAMETERS ---
 MAX_SPEED = 15.0       
@@ -81,27 +81,38 @@ while robot.step(timestep) != -1:
     dx = target_x - curr_pos[0]
     dy = target_y - curr_pos[1]
     dist_to_target = math.hypot(dx, dy)
-    
-    # 1. Determine Target Angle and Base Speed
-    if not is_chasing and dist_to_target < 0.05:
-        # WAITING/MARKING: Reached the geometric spot. Face the ball perfectly.
-        base_speed = 0.0
-        target_angle = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
+
+    # How misaligned is our target vs where we're facing the ball?
+    # When target is far off-axis, steer toward TARGET first, then ball when close
+    ball_angle = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
+    target_drive_angle = math.atan2(dy, dx)
+
+    # Blend: prioritize driving to target when far, face ball when arrived
+    # blend=1.0 → steer to target, blend=0.0 → face ball
+    if dist_to_target > 0.05:
+        blend = min(1.0, dist_to_target / 0.3)  # tune 0.3 to taste
     else:
-        # DRIVING OR CHASING
-        target_angle = math.atan2(dy, dx)
-        
-        if dist_to_target > 0.15:
-            base_speed = MAX_SPEED
+        blend = 0.0
+
+    target_angle = ball_angle + blend * (target_drive_angle - ball_angle)
+
+    # Normalize target_angle
+    if target_angle > math.pi: target_angle -= 2 * math.pi
+    if target_angle < -math.pi: target_angle += 2 * math.pi
+
+    # Speed: no longer suppressed by projection, just use dist directly
+    if not is_chasing and dist_to_target < 0.05:
+        base_speed = 0.0
+    elif dist_to_target > 0.15:
+        base_speed = MAX_SPEED
+    else:
+        if is_chasing:
+            base_speed = max(MAX_SPEED * 0.5, MAX_SPEED * (dist_to_target / 0.15))
         else:
-            if is_chasing:
-                # TACTICAL RAM: Never stop, hit at a minimum of 50% max speed
-                speed_ratio = dist_to_target / 0.15
-                base_speed = max(MAX_SPEED * 0.5, MAX_SPEED * speed_ratio)
-            else:
-                # SMOOTH ARRIVAL: Brake smoothly to hit the marking spot without overshooting
-                base_speed = MAX_SPEED * (dist_to_target / 0.15)
-                base_speed = max(base_speed, 5.0) 
+            base_speed = max(5.0, MAX_SPEED * (dist_to_target / 0.15))
+
+    # Remove the forward_component suppression entirely
+    # The blend above handles steering, speed is purely distance-based
 
     # 2. PD Steering
     angle_error = target_angle - my_heading

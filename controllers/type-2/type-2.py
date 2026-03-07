@@ -18,17 +18,21 @@ right_motor.setPosition(float('inf'))
 ball_node = robot.getFromDef("Ball")
 
 # --- GAME PARAMETERS ---
-MY_GOAL_CENTER = [1.2, 0.0]  
-DEFENSE_RADIUS = 0.5 
+MY_GOAL_CENTER = [1.5, 0.0]  
+DEFENSE_RADIUS = 0.6  # Distance from goal center to position the defender (tune as needed) 
 
 # --- MOVEMENT PARAMETERS ---
-MAX_SPEED = 21.0       # Upgraded to your custom e-puck max
-BLOCKING_SPEED = 12.0
+MAX_SPEED = 15.0       # Upgraded to your custom e-puck max speed
+MAX_TURN = 10.0       # Max turn speed (tune as needed)
 
 # PD Steering Constants
-Kp = 5.0
-Kd = 1.5               # Added damping to prevent wobbling
+Kp = 3.0
+Kd = 1.0               # Added damping to prevent wobbling
 prev_error = 0.0
+
+ACCEL = 0.2   # Lower = slower reaction
+base_speed_curr = 0.0
+turn_curr = 0.0
 
 while robot.step(timestep) != -1:
     if ball_node is None: continue
@@ -73,7 +77,7 @@ while robot.step(timestep) != -1:
         else:
             base_speed = MAX_SPEED * (dist_to_target / 0.15)
             # Ensure it doesn't drop so low that it stalls before reaching the point
-            base_speed = max(base_speed, 5.0) 
+            base_speed = max(base_speed, 10.0) 
 
     # 2. PD Steering
     angle_error = target_angle - my_heading
@@ -82,6 +86,7 @@ while robot.step(timestep) != -1:
 
     error_rate = angle_error - prev_error
     turn_amount = (Kp * angle_error) + (Kd * error_rate)
+    turn_amount = max(min(turn_amount, MAX_TURN), -MAX_TURN)  # Clamp turn amount to max turn speed
     prev_error = angle_error 
     
     # 3. FORGIVING PIVOT LOGIC
@@ -95,8 +100,12 @@ while robot.step(timestep) != -1:
     current_base_speed = base_speed * speed_multiplier
     
     # 4. Motor Mixing & Clamping
-    left_speed = current_base_speed - turn_amount
-    right_speed = current_base_speed + turn_amount
+    # --- REACTION SPEED NERF (SMOOTHING) ---
+    base_speed_curr += (current_base_speed - base_speed_curr) * ACCEL
+    turn_curr += (turn_amount - turn_curr) * ACCEL
+
+    left_speed = base_speed_curr - turn_curr
+    right_speed = base_speed_curr + turn_curr
     
     left_speed = max(min(left_speed, MAX_SPEED), -MAX_SPEED)
     right_speed = max(min(right_speed, MAX_SPEED), -MAX_SPEED)

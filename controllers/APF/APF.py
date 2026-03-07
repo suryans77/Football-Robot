@@ -50,7 +50,7 @@ REPULSION_RADIUS = 0.5
 
 # Speed Parameters
 MAX_SPEED = 21.0
-DRIBBLE_SPEED = 8.0  # Reduced from 10.0 for better ball control
+DRIBBLE_SPEED = 10.0  # Reduced from 10.0 for better ball control
 APPROACH_SPEED = 10.0
 SEARCH_SPEED = 4.0
 
@@ -61,7 +61,7 @@ LOWER_ORANGE = np.array([0, 150, 50])
 UPPER_ORANGE = np.array([20, 255, 255])
 
 # Turning Parameters
-MAX_TURN_RATE = 3.5  # Maximum turning differential
+MAX_TURN_RATE = 2.5  # Maximum turning differential
 ANGLE_TOLERANCE = 0.2  # Radians - acceptable heading error
 
 # Escape Mechanism

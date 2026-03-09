@@ -22,12 +22,12 @@ MY_GOAL_CENTER = [2.0, 0.0]
 DEFENSE_RADIUS = 0.6  # Distance from goal center to position the defender (tune as needed) 
 
 # --- MOVEMENT PARAMETERS ---
-MAX_SPEED = 15.0       # Upgraded to your custom e-puck max speed
-MAX_TURN = 10.0       # Max turn speed (tune as needed)
+MAX_SPEED = 18.0       # Upgraded to your custom e-puck max speed
+MAX_TURN = 9.0       # Max turn speed (tune as needed)
 
 # PD Steering Constants
-Kp = 3.0
-Kd = 1.0               # Added damping to prevent wobbling
+Kp = 4.0
+Kd = 1.2               # Added damping to prevent wobbling
 prev_error = 0.0
 
 ACCEL = 0.2   # Lower = slower reaction

@@ -5,7 +5,7 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/project
 EXTERNPROTO "../protos/SoccerBall.proto"
 
 WorldInfo {
-  basicTimeStep 16
+  basicTimeStep 8
   FPS 20
   contactProperties [
     ContactProperties {
@@ -1428,7 +1428,7 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.026000000000013717 0.02
+        translation 0 0.026000000000014675 0.02
         rotation 0 -1 0 4.2146848510894035e-08
         children [
           DEF EPUCK_WHEEL Pose {
@@ -1581,7 +1581,7 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.026000000000013717 0.02
+        translation 0 -0.026000000000014675 0.02
         rotation 0 -1 0 4.2146848510894035e-08
         children [
           Pose {

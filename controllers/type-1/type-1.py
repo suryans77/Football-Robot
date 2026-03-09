@@ -22,8 +22,8 @@ MY_GOAL_CENTER = [2.0, 0.0]
 MARKING_DIST = 0.3     # The distance to maintain from the attacker in the 1.0-1.5m zone
 
 # --- MOVEMENT PARAMETERS ---
-MAX_SPEED = 15.0       
-MAX_TURN = 10.0        
+MAX_SPEED = 18.0       
+MAX_TURN = 6.0        
 
 # PD Steering & Smoothing Constants
 Kp = 3.0
@@ -58,7 +58,7 @@ while robot.step(timestep) != -1:
     # --- BEHAVIOR STATE MACHINE ---
     is_chasing = False
 
-    if dist_goal_to_ball < 1.5 and ball_pos[0] > curr_pos[0]:
+    if (dist_goal_to_ball < 1.5 and ball_pos[0] > curr_pos[0]) or dist_goal_to_ball < 1.0:
         target_x = ball_pos[0]
         target_y = ball_pos[1]
         is_chasing = True
@@ -67,8 +67,8 @@ while robot.step(timestep) != -1:
         # STATE 2: LATERAL CONTAINMENT (The Wall)
         # Anchor the depth 1.0m away from the goal center.
         # Purely mirror the Y movement to slide laterally and block the lane.
-        target_x = ball_pos[0] + 0.3  
-        target_y = ball_pos[1]
+        target_x = ball_pos[0] + 0.3
+        target_y = max(min(ball_pos[1], 1.3), -1.3)
 
     elif dist_goal_to_ball <= 3.0:
         # STATE 3: MAN-MARKING 
@@ -91,7 +91,7 @@ while robot.step(timestep) != -1:
     angle_to_ball = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
 
     # === HYBRID BEHAVIOR CORE LOGIC ===
-    if dist_to_target > 0.25 or is_chasing:
+    if dist_to_target > 0.2 or is_chasing:
         # 1. RECOVERY SPRINT: We are out of position or tackling!
         # Stop looking at the ball. Look exactly at the waypoint and drive there fast.
         target_angle = angle_to_spot

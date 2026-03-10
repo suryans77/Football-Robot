@@ -23,8 +23,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation 0.38005364760611526 -0.6896273918904078 -0.6164197314295842 4.953646596539156
-  position -1.5578635842848603 -1.676765646150073 3.553784474363565
+  orientation 0.37669477132914464 -0.6908909802563583 -0.6170662060538493 4.966716640406164
+  position -1.5954649628191508 -1.6931388517514772 3.5328404278638277
 }
 RectangleArena {
   floorSize 4.2 2.75
@@ -201,8 +201,8 @@ Background {
   ]
 }
 DEF defender1 Robot {
-  translation 1.45 -0.0427812 -0.000101003
-  rotation 3.4682478460723463e-09 -1.6051177458688578e-09 -1 0.3550058491419236
+  translation 1.5708838631367894 -0.09022867560429318 -5.9771398353202984e-05
+  rotation -0.0008068980737387326 -0.00441821815242767 -0.9999899140810652 0.36122946355419977
   children [
     Compass {
     }
@@ -210,6 +210,7 @@ DEF defender1 Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position 6.873335416916527
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -225,8 +226,8 @@ DEF defender1 Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.026 0.02
-        rotation 0 1 0 0
+        translation 0 0.025999999999999714 0.02
+        rotation 0 -1 0 5.693035197442645
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -362,6 +363,7 @@ DEF defender1 Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position 6.873335415006846
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -378,7 +380,7 @@ DEF defender1 Robot {
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
         translation 0 -0.026 0.02
-        rotation 0 1 0 0
+        rotation 0 -1 0 5.693035199352328
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -1400,11 +1402,11 @@ DEF defender1 Robot {
   remoteControl "e-puck_bluetooth"
 }
 DEF Ball SoccerBall {
-  translation -0.526495 0.00750429 0.0288462
+  translation -0.73649 0.00750429 0.020982
 }
 DEF striker Robot {
-  translation -0.72 -1.501e-11 -0.000109745
-  rotation 0.6757921215986357 0.7370132020537541 0.01079575767081996 1.8519145614454984e-09
+  translation -0.93 -1.92099e-11 -5.9845e-05
+  rotation 0.8881299567391969 0.45956776523578924 0.0047591069135752275 4.201460889140567e-09
   children [
     Compass {
     }
@@ -1412,7 +1414,7 @@ DEF striker Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
-        position -4.6006073617377297e-08
+        position -2.050240122105501e-08
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -1428,8 +1430,8 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.026000000000014675 0.02
-        rotation 0 -1 0 4.2146848510894035e-08
+        translation 0 0.02600000000001623 0.02
+        rotation 0 1 0 0
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -1565,7 +1567,7 @@ DEF striker Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
-        position -4.600605463283746e-08
+        position -2.0502382183334683e-08
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -1581,8 +1583,8 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.026000000000014675 0.02
-        rotation 0 -1 0 4.2146848510894035e-08
+        translation 0 -0.02600000000001623 0.02
+        rotation 0 1 0 0
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -2604,6 +2606,8 @@ DEF striker Robot {
   remoteControl "e-puck_bluetooth"
 }
 DEF defender2 Robot {
+  translation -0.475178 -1.52772 -0.00231159
+  rotation 0.0007022121081521088 -0.0009603724207072605 0.9999992922912341 1.2623932767871489
   children [
     Compass {
     }
@@ -2611,6 +2615,7 @@ DEF defender2 Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position -1.653366573767232
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -2626,8 +2631,8 @@ DEF defender2 Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.026 0.02
-        rotation 0 1 0 0
+        translation 0 0.02599999999999985 0.02
+        rotation 0 -1 0 1.653366573767232
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -2763,6 +2768,7 @@ DEF defender2 Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position 1.9887698033785643
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -2778,8 +2784,8 @@ DEF defender2 Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.026 0.02
-        rotation 0 1 0 0
+        translation 0 -0.0259999999999997 0.02
+        rotation 0 1 0 1.9887698033785643
         children [
           Pose {
             rotation 1 0 0 3.14159
@@ -3801,7 +3807,8 @@ DEF defender2 Robot {
   remoteControl "e-puck_bluetooth"
 }
 DEF defender3 Robot {
-  translation 0.6 0 0
+  translation 0.7099359069801844 8.538959319092152e-05 -5.976443355996085e-05
+  rotation 0.0020434914123890285 -0.7460562550194649 0.6658797853135193 0.002162873190978765
   children [
     Compass {
     }
@@ -3809,6 +3816,7 @@ DEF defender3 Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position 5.629154932723668
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -3824,8 +3832,8 @@ DEF defender3 Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.026 0.02
-        rotation 0 1 0 0
+        translation 0 0.025999999999999857 0.02
+        rotation 0 1 0 5.629154932723668
         children [
           DEF EPUCK_WHEEL Pose {
             rotation 1 0 0 -1.570796
@@ -3961,6 +3969,7 @@ DEF defender3 Robot {
     }
     HingeJoint {
       jointParameters HingeJointParameters {
+        position 5.633209766444274
         axis 0 1 0
         anchor 0 0 0.02
       }
@@ -3977,7 +3986,7 @@ DEF defender3 Robot {
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
         translation 0 -0.026 0.02
-        rotation 0 1 0 0
+        rotation 0 1 0 5.633209766444274
         children [
           Pose {
             rotation 1 0 0 3.14159

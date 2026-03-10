@@ -36,7 +36,7 @@ ACCEL        = 0.35     # Higher than defender — keeper needs snappier respons
 base_speed_curr = 0.0
 turn_curr       = 0.0
 
-def predict_intercept(ball_pos, ball_vel, goal_x, steps=15, dt=0.032):
+def predict_intercept(ball_pos, ball_vel, goal_x, steps=25, dt=0.032):
     """
     Walk the ball forward in time. Return the Y position where it
     crosses the keeper's X plane (goal_x). Falls back to current ball Y.
@@ -68,59 +68,43 @@ while robot.step(timestep) != -1:
     is_shot_incoming = ball_speed > SHOT_THRESHOLD and ball_vel[0] > 0.2
 
     # --- STRATEGY ---
-    if is_shot_incoming:
-        # STATE 1: DIVE — intercept predicted ball position, not current position
-        intercept_y = predict_intercept(ball_pos, ball_vel, GOAL_CENTER[0])
+    # Anchor the keeper strictly to a 1D line 15cm in front of the goal center
+    FIXED_X = GOAL_CENTER[0] - 0.1 
+    target_x = FIXED_X
 
+    if is_shot_incoming:
+        # STATE 1: DIVE to the intercepted Y coordinate
+        intercept_y = predict_intercept(ball_pos, ball_vel, FIXED_X)
+        
         if intercept_y is not None:
-            # Dive to where the ball will cross the line
-            target_x = GOAL_CENTER[0] - 0.05   # Just in front of goal line
             target_y = max(min(intercept_y, GOAL_Y_LIMIT), -GOAL_Y_LIMIT)
         else:
-            # Ball not heading to goal — hold arc position
             is_shot_incoming = False
 
     if not is_shot_incoming:
-        # STATE 2: ARC TRACKING — slide along arc facing the ball
-        vec_x = ball_pos[0] - GOAL_CENTER[0]
-        vec_y = ball_pos[1] - GOAL_CENTER[1]
-        dist_goal_to_ball = math.hypot(vec_x, vec_y)
-
-        if dist_goal_to_ball < 0.001:
-            unit_x, unit_y = -1.0, 0.0
-        else:
-            unit_x = vec_x / dist_goal_to_ball
-            unit_y = vec_y / dist_goal_to_ball
-
-        target_x = GOAL_CENTER[0] + unit_x * KEEPER_RADIUS
-        target_y = GOAL_CENTER[1] + unit_y * KEEPER_RADIUS
-        target_y = max(min(target_y, GOAL_Y_LIMIT), -GOAL_Y_LIMIT)
+        # STATE 2: 1D TRACKING — purely mirror ball's Y on the fixed line
+        target_y = max(min(ball_pos[1], GOAL_Y_LIMIT), -GOAL_Y_LIMIT)
 
     # --- NAVIGATION ---
     dx = target_x - curr_pos[0]
     dy = target_y - curr_pos[1]
     dist_to_target = math.hypot(dx, dy)
 
-    ball_angle         = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
-    target_drive_angle = math.atan2(dy, dx)
+    angle_to_spot = math.atan2(dy, dx)
+    angle_to_ball = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
 
-    if not is_shot_incoming and dist_to_target < 0.04:
-        # On the arc — face ball, stop
+    if dist_to_target < 0.05:
+        # Arrived at the blocking spot — square up to face the ball!
         base_speed   = 0.0
-        target_angle = ball_angle
+        target_angle = angle_to_ball
     else:
+        # Determine speed based on dive vs tracking
         if is_shot_incoming:
-            base_speed   = SPEED
-            target_angle = target_drive_angle  # Full speed, steer to intercept
+            base_speed = SPEED
         else:
-            # Blend heading: face target while moving, rotate to ball on arrival
-            blend        = min(1.0, dist_to_target / 0.2)
-            target_angle = ball_angle + blend * (target_drive_angle - ball_angle)
+            base_speed = max(5.0, SPEED * (dist_to_target / 0.1))
 
-            if dist_to_target > 0.1:
-                base_speed = SPEED
-            else:
-                base_speed = max(4.0, SPEED * (dist_to_target / 0.1))
+        target_angle = angle_to_spot
 
     # --- PD STEERING ---
     angle_error = target_angle - my_heading

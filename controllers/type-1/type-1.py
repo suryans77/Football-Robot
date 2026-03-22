@@ -26,8 +26,8 @@ MAX_SPEED = 18.0
 MAX_TURN = 6.0        
 
 # PD Steering & Smoothing Constants
-Kp = 3.0
-Kd = 1.0               
+Kp = 3.2
+Kd = 1.0              
 ACCEL = 0.2   
 prev_error = 0.0
 base_speed_curr = 0.0
@@ -65,7 +65,7 @@ while robot.step(timestep) != -1:
 
     elif dist_goal_to_ball < 2.0:
         # STATE 2: LATERAL CONTAINMENT (The Wall)
-        # Anchor the depth 1.0m away from the goal center.
+        # Anchor the depth 2.0m away from the goal center.
         # Purely mirror the Y movement to slide laterally and block the lane.
         target_x = ball_pos[0] + 0.3
         target_y = max(min(ball_pos[1], 1.3), -1.3)

@@ -26,7 +26,7 @@ MAX_SPEED = 18.0
 MAX_TURN = 6.0        
 
 # PD Steering & Smoothing Constants
-Kp = 3.2
+Kp = 3.0
 Kd = 1.0              
 ACCEL = 0.2   
 prev_error = 0.0
@@ -78,7 +78,6 @@ while robot.step(timestep) != -1:
 
     else:
         # STATE 4: HOLD THE LINE 
-        # Wait at the edge of the 1.5m defensive zone.
         target_x = MY_GOAL_CENTER[0] - (dir_bg_x * 2.5)
         target_y = MY_GOAL_CENTER[1] - (dir_bg_y * 2.5)
 
@@ -91,7 +90,7 @@ while robot.step(timestep) != -1:
     angle_to_ball = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
 
     # === HYBRID BEHAVIOR CORE LOGIC ===
-    if dist_to_target > 0.2 or is_chasing:
+    if dist_to_target > 0.15 or is_chasing:
         # 1. RECOVERY SPRINT: We are out of position or tackling!
         # Stop looking at the ball. Look exactly at the waypoint and drive there fast.
         target_angle = angle_to_spot

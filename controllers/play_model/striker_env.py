@@ -202,12 +202,3 @@ class StrikerRLEnv(gym.Env):
             done = True
 
         return self._get_obs(), reward, done, False, {}
-
-# ================= MAIN EXECUTION =================
-if __name__ == '__main__':
-    env = StrikerRLEnv()
-    print("--- STARTING RL TRAINING (PPO) ---")
-    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.0003, n_steps=1024)
-    model.learn(total_timesteps=100000)
-    model.save("ppo_striker_brain")
-    print("--- TRAINING COMPLETE AND SAVED ---")

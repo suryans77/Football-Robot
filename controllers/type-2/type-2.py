@@ -26,7 +26,7 @@ MAX_SPEED = 18.0       # Upgraded to your custom e-puck max speed
 MAX_TURN = 6.0       # Max turn speed (tune as needed)
 
 # PD Steering Constants
-Kp = 3.6
+Kp = 4.0
 Kd = 1.2               # Added damping to prevent wobbling
 prev_error = 0.0
 

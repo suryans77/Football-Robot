@@ -23,8 +23,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation 0.3827899447103419 -0.6914749283395524 -0.6126453147674146 4.941941996801352
-  position -1.4451116816115483 -1.5906491408257901 3.6952072974076855
+  orientation 0.3710912250912203 -0.6155361527702955 -0.6952744402702006 4.987772501953974
+  position -1.6451792931146698 -2.4784315826829464 3.6197286326971727
 }
 RectangleArena {
   floorSize 4.2 2.75
@@ -201,7 +201,7 @@ Background {
   ]
 }
 DEF defender1 Robot {
-  translation 0.593014 0.150929 -0.00167339
+  translation 1.35419 0.355014 -0.000640691
   rotation -0.0008068980737387326 -0.00441821815242767 -0.9999899140810652 0.36122946355419977
   children [
     Compass {
@@ -226,7 +226,7 @@ DEF defender1 Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.025999999999996446 0.02
+        translation 0 0.025999999999989882 0.02
         rotation 0 -1 0 5.693035197442645
         children [
           DEF EPUCK_WHEEL Pose {
@@ -379,7 +379,7 @@ DEF defender1 Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.026000000000000054 0.02
+        translation 0 -0.02599999999999784 0.02
         rotation 0 -1 0 5.693035199352328
         children [
           Pose {
@@ -1430,7 +1430,7 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.026000000000020795 0.02
+        translation 0 0.026000000000022113 0.02
         rotation 0 1 0 0
         children [
           DEF EPUCK_WHEEL Pose {
@@ -1583,7 +1583,7 @@ DEF striker Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.02600000000002085 0.02
+        translation 0 -0.026000000000022578 0.02
         rotation 0 1 0 0
         children [
           Pose {
@@ -2600,13 +2600,13 @@ DEF striker Robot {
     damping Damping {
     }
   }
-  controller "rl_striker"
+  controller "record_expert"
   supervisor TRUE
   cpuConsumption 1.11
   remoteControl "e-puck_bluetooth"
 }
 DEF defender2 Robot {
-  translation 0.230893 -0.167876 -0.00019142
+  translation 0.752746 -0.407576 -0.000289857
   rotation 0.0007022121081521088 -0.0009603724207072605 0.9999992922912341 1.2623932767871489
   children [
     Compass {
@@ -2631,7 +2631,7 @@ DEF defender2 Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.025999999999997775 0.02
+        translation 0 0.025999999999992696 0.02
         rotation 0 -1 0 1.653366573767232
         children [
           DEF EPUCK_WHEEL Pose {
@@ -2784,7 +2784,7 @@ DEF defender2 Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.02599999999999594 0.02
+        translation 0 -0.025999999999989042 0.02
         rotation 0 1 0 1.9887698033785643
         children [
           Pose {
@@ -3807,7 +3807,7 @@ DEF defender2 Robot {
   remoteControl "e-puck_bluetooth"
 }
 DEF defender3 Robot {
-  translation 0.109526 0.289233 -0.00102698
+  translation 0.109761 0.11923 -0.00102754
   rotation 0.0020434914123890285 -0.7460562550194649 0.6658797853135193 0.002162873190978765
   children [
     Compass {
@@ -3832,7 +3832,7 @@ DEF defender3 Robot {
         }
       ]
       endPoint DEF EPUCK_LEFT_WHEEL Solid {
-        translation 0 0.025999999999997782 0.02
+        translation 0 0.025999999999992356 0.02
         rotation 0 1 0 5.629154932723668
         children [
           DEF EPUCK_WHEEL Pose {
@@ -3985,7 +3985,7 @@ DEF defender3 Robot {
         }
       ]
       endPoint DEF EPUCK_RIGHT_WHEEL Solid {
-        translation 0 -0.025999999999999798 0.02
+        translation 0 -0.025999999999997112 0.02
         rotation 0 1 0 5.633209766444274
         children [
           Pose {

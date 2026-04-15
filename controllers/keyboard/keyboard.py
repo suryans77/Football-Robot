@@ -32,14 +32,10 @@ for i in range(1, 4):
 ball_node = robot.getFromDef("Ball")
 
 # ================= PARAMETERS =================
-DRIBBLE_SPEED = 15.0
-MAX_SPEED = 18.0
-DRIBBLE_TURN = 5.0    
-MAX_TURN = 6.0
-DRIBBLE_ACCEL = 0.2   
-MAX_ACCEL = 0.25
+MAX_SPEED = 15.0
+TURN_BIAS = 5.0    
+ACCEL = 0.2       
 SHOOT_POWER = 3.0  
-KICK_POWER = 0.8
 LOG_FREQUENCY = 8  
 DRIBBLER_OFFSET = 0.05  # Distance from robot center to the front "notch"
 DRIBBLER_PULL = 15.0    # Strength of the sticky effect
@@ -58,7 +54,6 @@ while robot.step(timestep) != -1:
     v_target = 0
     w_target = 0
     shoot_flag = 0
-    kick_flag = 0
     
     # Get Self State
     pos = gps.getValues()
@@ -86,29 +81,12 @@ while robot.step(timestep) != -1:
     # 1. Keyboard Logic
     key = keyboard.getKey()
     while key != -1:
-        if key == ord('W'): 
-            if is_dribbling:
-                v_target = DRIBBLE_SPEED
-            else:
-                v_target = MAX_SPEED
-        elif key == ord('S'): 
-            if is_dribbling:
-                v_target = -DRIBBLE_SPEED
-            else:
-                v_target = -MAX_SPEED
+        if key == ord('W'): v_target = MAX_SPEED
+        elif key == ord('S'): v_target = -MAX_SPEED
             
-        if key == ord('A'): 
-            if is_dribbling:
-                w_target = DRIBBLE_TURN
-            else:                
-                w_target = MAX_TURN   
-        elif key == ord('D'): 
-            if is_dribbling:
-                w_target = -DRIBBLE_TURN
-            else:
-                w_target = -MAX_TURN
-
-
+        if key == ord('A'): w_target = TURN_BIAS   
+        elif key == ord('D'): w_target = -TURN_BIAS  
+            
         # Shooting (Overrides Dribbling)
         if key == ord(' '):
             if is_dribbling:
@@ -119,21 +97,11 @@ while robot.step(timestep) != -1:
                 kick_vx = np.cos(heading) * SHOOT_POWER
                 kick_vy = np.sin(heading) * SHOOT_POWER
                 ball_node.setVelocity([kick_vx, kick_vy, 0.5, 0.0, 0.0, 0.0])
-
-        elif key == ord('K'):
-            if is_dribbling:
-                kick_flag = 1
-                is_dribbling = False # Break the sticky lock
-                
-                # Apply massive impulse
-                kick_vx = np.cos(heading) * KICK_POWER
-                kick_vy = np.sin(heading) * KICK_POWER
-                ball_node.setVelocity([kick_vx, kick_vy, 0.0, 0.0, 0.0, 0.0])
                     
         key = keyboard.getKey()
 
     # --- APPLY PSEUDO-DRIBBLER PHYSICS ---
-    if is_dribbling and (shoot_flag == 0 and kick_flag== 0):
+    if is_dribbling and shoot_flag == 0:
         # Calculate the ideal Cartesian coordinate of the dribbler notch
         notch_x = pos[0] + np.cos(heading) * DRIBBLER_OFFSET
         notch_y = pos[1] + np.sin(heading) * DRIBBLER_OFFSET
@@ -146,15 +114,11 @@ while robot.step(timestep) != -1:
         ball_node.setVelocity([pull_vx, pull_vy, 0.0, 0.0, 0.0, 0.0])
 
     # 2. Apply Motor Smoothing 
-    if is_dribbling:
-        v_curr += (v_target - v_curr) * DRIBBLE_ACCEL
-        w_curr += (w_target - w_curr) * DRIBBLE_ACCEL
-    else:
-        v_curr += (v_target - v_curr) * MAX_ACCEL
-        w_curr += (w_target - w_curr) * MAX_ACCEL
-
-    left_speed = max(min(v_curr - w_curr, 21.0), -21.0)
-    right_speed = max(min(v_curr + w_curr, 21.0), -21.0)
+    v_curr += (v_target - v_curr) * ACCEL
+    w_curr += (w_target - w_curr) * ACCEL
+    
+    left_speed = max(min(v_curr - w_curr, 20.0), -20.0)
+    right_speed = max(min(v_curr + w_curr, 20.0), -20.0)
 
     left_motor.setVelocity(left_speed)
     right_motor.setVelocity(right_speed)
@@ -167,7 +131,7 @@ while robot.step(timestep) != -1:
             "pos": [round(p, 2) for p in pos[:2]],
             "heading": round(heading, 2),
             "defenders": [[round(coord, 2) for coord in d_pos] for d_pos in def_positions],
-            "action": [round(left_speed, 2), round(right_speed, 2), shoot_flag, kick_flag]
+            "action": [round(left_speed, 2), round(right_speed, 2), shoot_flag]
         }
         
         print(f"LOG | Pos: {log_entry['pos']}, H:{log_entry['heading']} | Act: {log_entry['action']}")

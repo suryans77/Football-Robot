@@ -31,7 +31,7 @@ class DiscreteQNetwork(nn.Module):
 
 def play():
     # Use the _best checkpoint, not the last one
-    ckpt_path = "iq_striker_brain_best.pt"
+    ckpt_path = "iq_striker_type_2.pt"
     print(f"--- LOADING DISCRETE IQ-LEARN BRAIN ({ckpt_path}) ---")
 
     ckpt       = torch.load(ckpt_path, map_location="cpu", weights_only=False)

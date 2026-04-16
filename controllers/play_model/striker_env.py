@@ -194,11 +194,11 @@ class StrikerRLEnv(gym.Env):
 
         if dist_ball_to_goal < 0.3:
             reward += 100.0 
-            done = True
-        elif pos[0] > 2.5 or pos[0] < -2.5 or pos[1] > 1.5 or pos[1] < -1.5:
+
+        if pos[0] > 2.5 or pos[0] < -2.5 or pos[1] > 1.5 or pos[1] < -1.5:
             reward -= 10.0 
             done = True
-        elif self.step_count > 1000: 
+        elif self.step_count > 250: 
             done = True
 
         return self._get_obs(), reward, done, False, {}

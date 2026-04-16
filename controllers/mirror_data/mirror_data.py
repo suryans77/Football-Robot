@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 
-def mirror_dataset(input_file="expert_data.pkl", output_file="expert_data_augmented.pkl"):
+def mirror_dataset(input_file="expert_data.pkl", output_file="expert_data_mirrored.pkl"):
     print(f"--- Loading {input_file} ---")
     try:
         with open(input_file, "rb") as f:

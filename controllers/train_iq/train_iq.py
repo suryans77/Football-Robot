@@ -73,10 +73,10 @@ def index_to_action(idx: int) -> np.ndarray:
 # ──────────────────────────────────────────────────────────────────────────────
 
 CFG = dict(
-    expert_path         = "expert_data.pkl",
+    expert_path         = "expert_data_mirrored.pkl",
     save_path           = "iq_striker_brain.pt",
     save_path_best      = "iq_striker_brain_best.pt",  # best checkpoint
-    total_timesteps     = 15_000,
+    total_timesteps     = 30_000,
     batch_size          = 64,
     hidden              = [128, 128],
     lr_q                = 3e-4,
@@ -88,7 +88,7 @@ CFG = dict(
     # ── NEW: CQL weight ──────────────────────────────────────────────
     # Start at 0.5. If Q-values still explode, increase to 1.0 or 2.0.
     # If the policy is too conservative (never moves), decrease to 0.1.
-    cql_weight          = 0.5,
+    cql_weight          = 1.0,
     # ─────────────────────────────────────────────────────────────────
     q_updates_per_step  = 1,
     tau                 = 0.005,

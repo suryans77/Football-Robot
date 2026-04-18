@@ -1,23 +1,26 @@
 """
-Discrete-Action IQ-Learn for a soccer-dribbling robot  (CPU-friendly)
-======================================================================
+Discrete-Action IQ-Learn (PURE) for a soccer-dribbling robot  (CPU-friendly)
+=============================================================================
 
-Fixes for Q-value explosion and policy regression
----------------------------------------------------
-1. CQL regularisation
-   Adds: cql_weight * E_s[ logsumexp(Q(s,·)) − Q(s, a_expert) ]
-   This directly penalises overestimated Q-values on non-expert actions.
-   Without this, the χ² term alone is too weak once the policy drifts
-   off the expert distribution.
+This is the pure IQ-Learn baseline — identical to train_iq_cql.py in every
+way EXCEPT the CQL regularisation term is removed.
 
-2. Double Q-networks (Q1, Q2)
-   Bellman targets use min(Q1_tgt, Q2_tgt) — halves overestimation bias.
-   Both networks are trained jointly with the same IQ+CQL loss.
+Use this to compare against the CQL version:
+  Pure IQ-Learn  →  iq_pure_brain_best.pt
+  IQ-Learn + CQL →  iq_striker_brain_best.pt
 
-3. Best-checkpoint saving
-   Tracks the best `expert_br` (mean Bellman residual on expert data).
-   Saves whenever it improves, so you keep the peak policy, not the
-   final one. A separate "last" checkpoint is also always saved.
+What is removed vs train_iq_cql.py
+-------------------------------------
+- cql_weight removed from CFG
+- CQL term removed from loss:
+    REMOVED:  lse = logsumexp(Q(s,·))
+    REMOVED:  cql_loss = (lse - Q(s, a_expert)).mean()
+    REMOVED:  loss += cql_weight * cql_loss
+- cql_loss and Q_spread removed from logs and print
+
+Everything else is identical:
+  double-Q networks, soft target updates, alpha auto-tune,
+  eval loop, best-checkpoint saving, expert loader, replay buffer.
 
 Action index mapping
 ---------------------
@@ -69,13 +72,13 @@ def index_to_action(idx: int) -> np.ndarray:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Config
+# Config  (cql_weight removed — only difference from train_iq_cql.py)
 # ──────────────────────────────────────────────────────────────────────────────
 
 CFG = dict(
     expert_path         = "expert_data_mirrored.pkl",
-    save_path           = "iq_striker_brain.pt",
-    save_path_best      = "iq_striker_brain_best.pt",  # best checkpoint
+    save_path           = "iq_pure_brain.pt",
+    save_path_best      = "iq_pure_brain_best.pt",
     total_timesteps     = 25_000,
     batch_size          = 64,
     hidden              = [128, 128],
@@ -85,11 +88,6 @@ CFG = dict(
     learn_alpha         = True,
     target_entropy      = -np.log(1.0 / N_ACTIONS) * 0.5,
     iq_reg              = 1e-3,
-    # ── NEW: CQL weight ──────────────────────────────────────────────
-    # Start at 0.5. If Q-values still explode, increase to 1.0 or 2.0.
-    # If the policy is too conservative (never moves), decrease to 0.1.
-    cql_weight          = 1.0,
-    # ─────────────────────────────────────────────────────────────────
     q_updates_per_step  = 1,
     tau                 = 0.005,
     warmup_steps        = 1_000,
@@ -165,12 +163,7 @@ def policy_probs(q_vals: torch.Tensor, alpha: float) -> torch.Tensor:
     return F.softmax(q_vals / alpha, dim=-1)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Double-Q helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
 def min_q(q1: torch.Tensor, q2: torch.Tensor) -> torch.Tensor:
-    """Element-wise minimum across two Q tensors — shape (batch, n_actions)"""
     return torch.min(q1, q2)
 
 
@@ -212,7 +205,7 @@ def load_expert(path: str, device: torch.device):
         dones = np.zeros(len(raw), dtype=np.float32)
         dones[-1] = 1.0
 
-    next_obs                  = np.roll(obs, -1, axis=0)
+    next_obs = np.roll(obs, -1, axis=0)
     next_obs[dones.astype(bool)] = obs[dones.astype(bool)]
 
     unique, counts = np.unique(act_idxs, return_counts=True)
@@ -235,36 +228,27 @@ def sample_expert(e_obs, e_acts, e_nobs, e_dones, n: int):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# IQ-Learn + CQL loss  (double-Q version)
+# Pure IQ-Learn loss  (CQL term removed)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def compute_iq_cql_loss(q1, q2, q1_tgt, q2_tgt,
-                        e_obs, e_acts, e_nobs, e_dones,
-                        p_obs, p_acts, p_nobs, p_dones,
-                        alpha, gamma, iq_reg, cql_weight):
+def compute_iq_loss(q1, q2, q1_tgt, q2_tgt,
+                    e_obs, e_acts, e_nobs, e_dones,
+                    p_obs, p_acts, p_nobs, p_dones,
+                    alpha, gamma, iq_reg):
     """
-    Combined IQ-Learn χ² loss + CQL regularisation.
+    Pure IQ-Learn χ² loss — no CQL term.
 
-    IQ-Learn terms
-    --------------
     expert_loss : -E_expert[ Q(s,a) - γ·V(s') - V(s) ]
                   Pushes Q up for actions the expert took.
 
-    chi2_loss   : 0.5 · E_policy[ (Q(s,a) - γ·V(s'))² ]
-                  χ² penalty — keeps Q from exploding off expert support.
+    chi2_loss   :  0.5 · E_policy[ (Q(s,a) - γ·V(s'))² ]
+                  χ² penalty — the only thing keeping Q bounded.
+                  (CQL version adds logsumexp on top of this.)
 
-    CQL term
-    --------
-    cql_loss    : E_s[ logsumexp(Q(s,·)) - Q(s, a_expert) ]
-                  Explicitly pushes Q DOWN for non-expert actions.
-                  This is the primary fix for Q-value overestimation.
-                  Without it, the χ² term alone loses control once the
-                  policy drifts off-distribution.
+    l2_loss     :  iq_reg · E_expert[ Q(s,a)² ]
+                  Light L2 to prevent unbounded growth.
 
-    Double-Q
-    --------
-    Bellman targets use min(Q1_tgt, Q2_tgt).
-    Both Q1 and Q2 are trained with the same combined loss.
+    Bellman targets use min(Q1_tgt, Q2_tgt) — double-Q kept.
     """
     def to_tensor(x):
         if isinstance(x, np.ndarray):
@@ -275,9 +259,9 @@ def compute_iq_cql_loss(q1, q2, q1_tgt, q2_tgt,
     e_nobs = to_tensor(e_nobs)
     p_obs  = to_tensor(p_obs)
     p_nobs = to_tensor(p_nobs)
-    batch = len(e_acts)
+    batch  = len(e_acts)
 
-    # ── Bellman targets use min of both target networks ───────────────
+    # ── Bellman targets — min of both target networks ─────────────────
     with torch.no_grad():
         v_e_next = soft_value_exact(min_q(q1_tgt(e_nobs), q2_tgt(e_nobs)), alpha)
         v_e_curr = soft_value_exact(min_q(q1_tgt(e_obs),  q2_tgt(e_obs)),  alpha)
@@ -287,11 +271,11 @@ def compute_iq_cql_loss(q1, q2, q1_tgt, q2_tgt,
     info = {}
 
     for qi, q_net in enumerate((q1, q2)):
-        q_e_all = q_net(e_obs)                                     # (B, 9)
-        q_p_all = q_net(p_obs)                                     # (B, 9)
+        q_e_all = q_net(e_obs)                               # (B, 9)
+        q_p_all = q_net(p_obs)                               # (B, 9)
 
-        q_e = q_e_all[torch.arange(batch), e_acts]                 # expert Q
-        q_p = q_p_all[torch.arange(batch), p_acts]                 # policy Q
+        q_e = q_e_all[torch.arange(batch), e_acts]           # expert Q
+        q_p = q_p_all[torch.arange(batch), p_acts]           # policy Q
 
         # ── IQ Bellman residuals ──────────────────────────────────────
         br_e = (q_e
@@ -305,25 +289,17 @@ def compute_iq_cql_loss(q1, q2, q1_tgt, q2_tgt,
         chi2_loss   =  0.5 * (br_p ** 2).mean()
         l2_loss     =  iq_reg * (q_e ** 2).mean()
 
-        # ── CQL term ──────────────────────────────────────────────────
-        # logsumexp over all actions (soft max-Q across action dim)
-        lse = torch.logsumexp(q_e_all, dim=-1)                    # (B,)
-        # Subtract the Q-value of the expert action — encourages Q to be
-        # LOW for non-expert actions relative to the expert action
-        cql_loss = (lse - q_e).mean()
+        # ── NO CQL term ───────────────────────────────────────────────
 
-        loss = expert_loss + chi2_loss + l2_loss + cql_weight * cql_loss
+        loss = expert_loss + chi2_loss + l2_loss
         total_loss = total_loss + loss
 
-        if qi == 0:   # log from Q1 only to avoid double-counting
+        if qi == 0:
             info = {
-                "iq_loss":    loss.item(),
-                "expert_Q":   q_e.mean().item(),
-                "policy_Q":   q_p.mean().item(),
-                "expert_br":  br_e.mean().item(),
-                "cql_loss":   cql_loss.item(),
-                # Q-value spread: large spread → overestimation starting
-                "Q_spread":   (lse - q_e).mean().item(),
+                "iq_loss":   loss.item(),
+                "expert_Q":  q_e.mean().item(),
+                "policy_Q":  q_p.mean().item(),
+                "expert_br": br_e.mean().item(),
             }
 
     return total_loss, info
@@ -373,9 +349,9 @@ def make_checkpoint(q1, q2, obs_dim, hidden, cfg):
 
 def train_iq():
     print("=" * 60)
-    print("Discrete IQ-Learn + CQL  –  Soccer Striker  (CPU)")
+    print("Discrete IQ-Learn (PURE)  –  Soccer Striker  (CPU)")
     print(f"Action space : {N_ACTIONS} discrete actions")
-    print(f"CQL weight   : {CFG['cql_weight']}")
+    print("No CQL regularisation — baseline for comparison")
     print("=" * 60)
 
     device = torch.device("cpu")
@@ -393,7 +369,6 @@ def train_iq():
     q1_tgt = deepcopy(q1); q1_tgt.eval()
     q2_tgt = deepcopy(q2); q2_tgt.eval()
 
-    # Single optimiser over both Q-networks
     q_opt = torch.optim.Adam(
         list(q1.parameters()) + list(q2.parameters()),
         lr=CFG["lr_q"]
@@ -415,11 +390,10 @@ def train_iq():
     buf = ReplayBuffer(CFG["buffer_size"], obs_dim)
 
     # ── logging ──────────────────────────────────────────────────────
-    log_keys  = ("iq_loss", "expert_Q", "policy_Q", "expert_br",
-                 "cql_loss", "Q_spread", "entropy")
-    logs      = {k: deque(maxlen=CFG["log_window"]) for k in log_keys}
-    best_br   = -float("inf")   # track best expert Bellman residual
-    best_eval_score = -float("inf")
+    log_keys = ("iq_loss", "expert_Q", "policy_Q", "expert_br", "entropy")
+    logs     = {k: deque(maxlen=CFG["log_window"]) for k in log_keys}
+    best_br          = -float("inf")
+    best_eval_score  = -float("inf")
 
     total   = CFG["total_timesteps"]
     bs      = CFG["batch_size"]
@@ -452,16 +426,16 @@ def train_iq():
         if t < warmup or buf.size < bs:
             continue
 
-        # ── 2. update Q (IQ + CQL loss) ───────────────────────────────
+        # ── 2. update Q (pure IQ loss) ────────────────────────────────
         for _ in range(CFG["q_updates_per_step"]):
             p_o, p_a, p_n, p_d = buf.sample(bs, device)
             e_o, e_a, e_n, e_d = sample_expert(e_obs, e_acts, e_nobs, e_dones, bs)
 
-            q_l, q_info = compute_iq_cql_loss(
+            q_l, q_info = compute_iq_loss(
                 q1, q2, q1_tgt, q2_tgt,
                 e_o, e_a, e_n, e_d,
                 p_o, p_a, p_n, p_d,
-                alpha, gamma, CFG["iq_reg"], CFG["cql_weight"],
+                alpha, gamma, CFG["iq_reg"],
             )
             q_opt.zero_grad()
             q_l.backward()
@@ -487,20 +461,15 @@ def train_iq():
         soft_update(q1, q1_tgt, CFG["tau"])
         soft_update(q2, q2_tgt, CFG["tau"])
 
-        # ── 5. physical exam & logging ────────────────────────────────
-
+        # ── 5. eval & logging ─────────────────────────────────────────
         if t % CFG["eval_interval"] == 0:
 
-            # 1. Compute means FIRST
-            means = {k: np.mean(v) for k, v in logs.items() if v}
-
-            # 2. Track best expert_br
+            means      = {k: np.mean(v) for k, v in logs.items() if v}
             current_br = means.get("expert_br", 0)
             if current_br > best_br:
                 best_br = current_br
 
-            # 3. Run evaluation
-            eval_score = 0.0
+            eval_score       = 0.0
             NUM_EVAL_EPISODES = 10
 
             for _ in range(NUM_EVAL_EPISODES):
@@ -508,9 +477,8 @@ def train_iq():
                 e_done = False
                 while not e_done:
                     with torch.no_grad():
-                        eval_obs_t = torch.as_tensor(eval_obs, dtype=torch.float32).unsqueeze(0)
+                        eval_obs_t   = torch.as_tensor(eval_obs, dtype=torch.float32).unsqueeze(0)
                         eval_act_idx = min_q(q1(eval_obs_t), q2(eval_obs_t)).argmax(dim=-1).item()
-
                     e_action = index_to_action(eval_act_idx)
                     eval_obs, r, term, trunc, _ = env.step(e_action)
                     eval_score += r
@@ -518,21 +486,17 @@ def train_iq():
 
             avg_eval_score = eval_score / NUM_EVAL_EPISODES
 
-            # 4. Print logs
             print(
                 f"[{t:>7,}/{total:,}]  "
                 f"fps={t/(time.time()-t_start):.0f}  "
-                f"IQ={means.get('iq_loss', 0):+.1f}  "
-                f"CQL={means.get('cql_loss', 0):+.1f}  "
+                f"IQ={means.get('iq_loss',  0):+.1f}  "
                 f"Q_exp={means.get('expert_Q', 0):+.1f}  "
                 f"br={means.get('expert_br', 0):+.3f}  "
                 f"best_br={best_br:+.3f}  "
-                f"spread={means.get('Q_spread', 0):.2f}  "
-                f"| EVAL SCORE: {avg_eval_score:.1f}"
+                f"| EVAL SCORE: {avg_eval_score:.1f}  "
                 f"| best_eval={best_eval_score:.1f}"
             )
 
-            # 6. Save best model
             if avg_eval_score >= best_eval_score:
                 best_eval_score = avg_eval_score
                 torch.save(

@@ -1,0 +1,10 @@
+# Deep Learning & Math
+torch>=2.0.0
+numpy>=1.21.0
+
+# Reinforcement Learning Environments & Algorithms
+gymnasium>=0.28.1
+stable-baselines3>=2.0.0
+
+# Note: The Webots 'controller' module is not pip-installable. 
+# It comes pre-installed with the Webots desktop application.

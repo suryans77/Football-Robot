@@ -6,7 +6,7 @@ policy was computed during training.
 import torch
 import torch.nn as nn
 import numpy as np
-from striker_env import StrikerRLEnv
+from my_envs.striker_env import StrikerRLEnv
 
 
 def _mlp(in_dim: int, out_dim: int, hidden: list[int]) -> nn.Sequential:

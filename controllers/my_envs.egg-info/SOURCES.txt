@@ -1,0 +1,7 @@
+setup.py
+my_envs/__init__.py
+my_envs/striker_env.py
+my_envs.egg-info/PKG-INFO
+my_envs.egg-info/SOURCES.txt
+my_envs.egg-info/dependency_links.txt
+my_envs.egg-info/top_level.txt

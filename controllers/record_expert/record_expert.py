@@ -2,7 +2,7 @@ import pickle
 import sys
 import numpy as np
 from controller import Keyboard
-from striker_env import StrikerRLEnv
+from my_envs.striker_env import StrikerRLEnv
 
 def record_data():
     env = StrikerRLEnv()

@@ -1,21 +1,21 @@
 """
-IQ-Learn + CQL evaluation — 100 episodes with final metrics
-=============================================================
+Pure IQ-Learn evaluation — 100 episodes with final metrics
+===========================================================
 
-Loads iq_striker_type_2.pt and runs the greedy policy
+Loads iq_pure_brain_best.pt and runs the greedy policy
 (argmax over min(Q1, Q2)) for exactly 100 episodes, then
 prints a full metrics summary in the same format as
-play_ppo.py, play_dqn.py, and play_iq_pure.py.
+play_ppo.py and play_dqn.py for direct comparison.
 
 Metrics reported
 -----------------
   Success rate     — % of episodes where ball reached the goal
   Failure rate     — % terminated by collision / out of bounds
   Timeout rate     — % that hit the step limit
-  Avg total reward — mean episode return ± std (also split by outcome)
+  Avg total reward — mean episode return ± std
   Avg episode steps
   Avg defenders beaten per episode
-  Action distribution — usage % for each of the 9 discrete actions
+  Action distribution — which of the 9 actions was used most
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 
@@ -30,13 +31,13 @@ from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 # Config
 # ──────────────────────────────────────────────────────────────────────────────
 
-CKPT_PATH   = "type_2_mIQ.pt"
+CKPT_PATH   = "type_2_pureIQ.pt"
 N_EPISODES  = 100
-GOAL_THRESH = 0.25   # must match striker_env — dist_ball_to_goal < this = goal
+GOAL_THRESH = 0.25   # must match striker_env
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Network — must match train_iq_cql.py exactly
+# Network — must match pure_iq.py exactly
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _mlp(in_dim: int, out_dim: int, hidden: list[int]) -> nn.Sequential:
@@ -65,16 +66,15 @@ class DiscreteQNetwork(nn.Module):
 
 def evaluate():
     print("=" * 60)
-    print(f"IQ-Learn + CQL Evaluation  —  {N_EPISODES} episodes")
+    print(f"Pure IQ-Learn Evaluation  —  {N_EPISODES} episodes")
     print(f"Checkpoint: {CKPT_PATH}")
     print("=" * 60)
 
     # ── load checkpoint ───────────────────────────────────────────────
-    ckpt       = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
-    obs_dim    = ckpt["obs_dim"]
-    n_actions  = ckpt["n_actions"]
-    hidden     = ckpt["hidden"]
-    action_set = ckpt["action_set"]   # use saved ACTION_SET, not imported one
+    ckpt      = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
+    obs_dim   = ckpt["obs_dim"]
+    n_actions = ckpt["n_actions"]
+    hidden    = ckpt["hidden"]
 
     q1 = DiscreteQNetwork(obs_dim, n_actions, hidden)
     q2 = DiscreteQNetwork(obs_dim, n_actions, hidden)
@@ -86,9 +86,9 @@ def evaluate():
     print(f"[Model]  obs_dim={obs_dim}  n_actions={n_actions}  hidden={hidden}")
 
     # ── environment ───────────────────────────────────────────────────
-    # Continuous env (not discrete=True) — this script passes the float
-    # action array from action_set, matching the original play() above
-    env = StrikerRLEnv()
+    # discrete=True so the env accepts integer action indices directly,
+    # consistent with how actions are resolved during training
+    env = StrikerRLEnv(discrete=True)
 
     # ── per-episode trackers ──────────────────────────────────────────
     ep_rewards          = []
@@ -98,8 +98,8 @@ def evaluate():
     ep_action_counts    = []
 
     for ep in range(1, N_EPISODES + 1):
-        np.random.seed(1000 + ep)                   # Force Numpy's global seed
-        obs, _         = env.reset(seed=1000 + ep)
+        np.random.seed(42 + ep)                   # Force Numpy's global seed
+        obs, _         = env.reset(seed=42 + ep)
         ep_reward      = 0.0
         ep_step        = 0
         defenders_beat = 0
@@ -108,14 +108,14 @@ def evaluate():
 
         while True:
             with torch.no_grad():
-                obs_t           = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
-                q_vals          = torch.min(q1(obs_t), q2(obs_t))
-                best_action_idx = q_vals.argmax(dim=-1).item()
-                action          = action_set[best_action_idx].copy()
+                obs_t   = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
+                # Greedy: argmax over min(Q1, Q2) — same as training inference
+                q_vals  = torch.min(q1(obs_t), q2(obs_t))
+                act_idx = q_vals.argmax(dim=-1).item()
 
-            action_counts[best_action_idx] += 1
+            action_counts[act_idx] += 1
 
-            obs, reward, terminated, truncated, _ = env.step(action)
+            obs, reward, terminated, truncated, _ = env.step(act_idx)
             ep_reward += reward
             ep_step   += 1
 
@@ -138,7 +138,7 @@ def evaluate():
                 break
 
         dominant_idx    = int(np.argmax(action_counts))
-        dominant_action = action_set[dominant_idx]
+        dominant_action = ACTION_SET[dominant_idx]
 
         ep_rewards.append(ep_reward)
         ep_steps.append(ep_step)
@@ -170,16 +170,18 @@ def evaluate():
     avg_steps    = np.mean(ep_steps)
     avg_beaten   = np.mean(ep_defenders_beaten)
 
+    # Reward breakdown by outcome
     goal_rewards    = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "goal"]
     fail_rewards    = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "fail"]
     timeout_rewards = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "timeout"]
 
+    # Action distribution
     total_counts    = np.sum(ep_action_counts, axis=0)
     total_steps_all = total_counts.sum()
 
     print()
     print("=" * 60)
-    print("IQ-Learn + CQL  —  FINAL EVALUATION METRICS  (100 episodes)")
+    print("Pure IQ-Learn  —  FINAL EVALUATION METRICS  (100 episodes)")
     print("=" * 60)
     print(f"  Success rate       : {success_rate:>6.1f}%   ({n_goal}/{N_EPISODES} goals)")
     print(f"  Failure rate       : {fail_rate:>6.1f}%   ({n_fail}/{N_EPISODES})")
@@ -197,17 +199,17 @@ def evaluate():
     print(f"  Avg defenders beat : {avg_beaten:>7.2f}")
     print()
     print("  Action distribution across all episodes:")
-    for idx, (action_vec, count) in enumerate(zip(action_set, total_counts)):
+    for idx, (action_vec, count) in enumerate(zip(ACTION_SET, total_counts)):
         pct = 100.0 * count / total_steps_all if total_steps_all > 0 else 0
         bar = "█" * int(pct / 2)
         print(f"    idx {idx}  {action_vec}  {pct:>5.1f}%  {bar}")
     print("=" * 60)
 
-    # ── CSV row — same format as all other play scripts ───────────────
+    # ── CSV row — same format as play_ppo.py and play_dqn.py ─────────
     print()
     print("CSV row (algorithm, success%, avg_reward, avg_steps, avg_beaten):")
     print(
-        f"IQ-Learn (CQL),"
+        f"IQ-Learn (Pure),"
         f"{success_rate:.1f},"
         f"{avg_reward:.2f},"
         f"{avg_steps:.1f},"

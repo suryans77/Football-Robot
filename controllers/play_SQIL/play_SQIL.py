@@ -1,18 +1,18 @@
 """
-IQ-Learn + CQL evaluation — 100 episodes with final metrics
-=============================================================
+SQIL evaluation — 100 episodes with final metrics
+==================================================
 
-Loads iq_striker_type_2.pt and runs the greedy policy
+Loads sqil_striker_brain_best.pt and runs the greedy policy
 (argmax over min(Q1, Q2)) for exactly 100 episodes, then
-prints a full metrics summary in the same format as
-play_ppo.py, play_dqn.py, and play_iq_pure.py.
+prints a full metrics summary in the same format as all
+other play scripts for direct comparison.
 
 Metrics reported
 -----------------
-  Success rate     — % of episodes where ball reached the goal
+  Success rate     — % episodes where ball reached the goal
   Failure rate     — % terminated by collision / out of bounds
   Timeout rate     — % that hit the step limit
-  Avg total reward — mean episode return ± std (also split by outcome)
+  Avg total reward — mean episode return ± std (split by outcome)
   Avg episode steps
   Avg defenders beaten per episode
   Action distribution — usage % for each of the 9 discrete actions
@@ -30,13 +30,13 @@ from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 # Config
 # ──────────────────────────────────────────────────────────────────────────────
 
-CKPT_PATH   = "type_2_mIQ.pt"
+CKPT_PATH   = "type_2_sqil.pt"
 N_EPISODES  = 100
-GOAL_THRESH = 0.25   # must match striker_env — dist_ball_to_goal < this = goal
+GOAL_THRESH = 0.25
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Network — must match train_iq_cql.py exactly
+# Network — must match train_sqil.py exactly
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _mlp(in_dim: int, out_dim: int, hidden: list[int]) -> nn.Sequential:
@@ -60,12 +60,12 @@ class DiscreteQNetwork(nn.Module):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Evaluation loop
+# Evaluation
 # ──────────────────────────────────────────────────────────────────────────────
 
 def evaluate():
     print("=" * 60)
-    print(f"IQ-Learn + CQL Evaluation  —  {N_EPISODES} episodes")
+    print(f"SQIL Evaluation  —  {N_EPISODES} episodes")
     print(f"Checkpoint: {CKPT_PATH}")
     print("=" * 60)
 
@@ -74,7 +74,7 @@ def evaluate():
     obs_dim    = ckpt["obs_dim"]
     n_actions  = ckpt["n_actions"]
     hidden     = ckpt["hidden"]
-    action_set = ckpt["action_set"]   # use saved ACTION_SET, not imported one
+    action_set = ckpt["action_set"]
 
     q1 = DiscreteQNetwork(obs_dim, n_actions, hidden)
     q2 = DiscreteQNetwork(obs_dim, n_actions, hidden)
@@ -86,14 +86,12 @@ def evaluate():
     print(f"[Model]  obs_dim={obs_dim}  n_actions={n_actions}  hidden={hidden}")
 
     # ── environment ───────────────────────────────────────────────────
-    # Continuous env (not discrete=True) — this script passes the float
-    # action array from action_set, matching the original play() above
-    env = StrikerRLEnv()
+    env = StrikerRLEnv(discrete=True)
 
     # ── per-episode trackers ──────────────────────────────────────────
     ep_rewards          = []
     ep_steps            = []
-    ep_outcomes         = []   # "goal" | "fail" | "timeout"
+    ep_outcomes         = []
     ep_defenders_beaten = []
     ep_action_counts    = []
 
@@ -111,11 +109,10 @@ def evaluate():
                 obs_t           = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
                 q_vals          = torch.min(q1(obs_t), q2(obs_t))
                 best_action_idx = q_vals.argmax(dim=-1).item()
-                action          = action_set[best_action_idx].copy()
 
             action_counts[best_action_idx] += 1
 
-            obs, reward, terminated, truncated, _ = env.step(action)
+            obs, reward, terminated, truncated, _ = env.step(best_action_idx)
             ep_reward += reward
             ep_step   += 1
 
@@ -179,7 +176,7 @@ def evaluate():
 
     print()
     print("=" * 60)
-    print("IQ-Learn + CQL  —  FINAL EVALUATION METRICS  (100 episodes)")
+    print("SQIL  —  FINAL EVALUATION METRICS  (100 episodes)")
     print("=" * 60)
     print(f"  Success rate       : {success_rate:>6.1f}%   ({n_goal}/{N_EPISODES} goals)")
     print(f"  Failure rate       : {fail_rate:>6.1f}%   ({n_fail}/{N_EPISODES})")
@@ -203,11 +200,10 @@ def evaluate():
         print(f"    idx {idx}  {action_vec}  {pct:>5.1f}%  {bar}")
     print("=" * 60)
 
-    # ── CSV row — same format as all other play scripts ───────────────
     print()
     print("CSV row (algorithm, success%, avg_reward, avg_steps, avg_beaten):")
     print(
-        f"IQ-Learn (CQL),"
+        f"SQIL,"
         f"{success_rate:.1f},"
         f"{avg_reward:.2f},"
         f"{avg_steps:.1f},"

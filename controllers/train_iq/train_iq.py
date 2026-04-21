@@ -73,7 +73,7 @@ def index_to_action(idx: int) -> np.ndarray:
 # ──────────────────────────────────────────────────────────────────────────────
 
 CFG = dict(
-    expert_path         = "expert_data_mirrored.pkl",
+    expert_path         = "type_2_data.pkl",
     save_path           = "iq_striker_brain.pt",
     save_path_best      = "iq_striker_brain_best.pt",  # best checkpoint
     total_timesteps     = 25_000,
@@ -192,7 +192,7 @@ def load_expert(path: str, device: torch.device):
         print(f"[Expert] First item  : {raw[0]}")
 
     if not hasattr(raw, '__len__') or len(raw) == 0:
-        raise ValueError("expert_data.pkl is empty. Re-run record_expert.py.")
+        raise ValueError("type_2_data.pkl is empty. Re-run record_expert.py.")
 
     obs      = np.array([d["obs"]    for d in raw], dtype=np.float32)
     act_idxs = np.array([action_to_index(d["action"]) for d in raw], dtype=np.int64)
@@ -381,7 +381,7 @@ def train_iq():
     device = torch.device("cpu")
 
     # ── environment ──────────────────────────────────────────────────
-    from striker_env import StrikerRLEnv
+    from my_envs.striker_env import StrikerRLEnv
     env     = StrikerRLEnv()
     obs_dim = env.observation_space.shape[0]
     print(f"[Env]  obs_dim={obs_dim}  n_actions={N_ACTIONS}")

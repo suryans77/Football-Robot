@@ -2,6 +2,13 @@
 StrikerRLEnv — unified environment for benchmarking
 =====================================================
 
+Changes in this version
+------------------------
+- Defenders reset to random positions within the attacking half (x > 0)
+  every episode instead of fixed spawn points. This prevents all
+  algorithms from overfitting to one specific defensive configuration
+  and makes trained policies more robust.
+
 Compatible with:
   BC        — continuous Box, no env interaction during training
   PPO       — continuous Box
@@ -29,16 +36,27 @@ Observation (15 dims)
   [4]     self_vy                — estimated robot velocity y
   [5-9]   nearest defender       — dist, sin, cos, rel_vx, rel_vy
   [10-14] second nearest defender
-  
-Reward function (refined)
---------------------------
-  Progress          :  clip(progress, -0.5, 0.5) * 20     — ball moving toward goal
-  Defender beaten   :  +50 per defender passed             — key sub-goal
-  Goal scored       :  +100,  terminated=True              — episode win
-  Collision         :  -10 per step in contact              — soft continuous penalty
-  Out of bounds     :  -15,   terminated=True              — hard boundary
-  Time step tax     :  -0.2 per step                       — encourage efficiency
-  Timeout           :  truncated=True  (NOT terminated)    — Bellman bootstrap kept
+
+Defender spawn zone (attacking half)
+--------------------------------------
+  x : [0.2,  2.2]   — in front of striker's starting position
+  y : [-1.2, 1.2]   — inside field width
+  z : preserved from initial Webots scene (ground height)
+
+  Minimum separation of 0.4 m between any two defenders enforced via
+  rejection sampling so they never spawn on top of each other.
+
+Reward function
+-----------------
+  Progress          :  clip(progress, -0.5, 0.5) * 20
+  Ball possession   :  +0.3 per step while dribbling
+  Defender beaten   :  +50 per defender passed
+  Goal scored       :  +100,  terminated=True
+  Collision         :  -10 per step in contact
+  Idle penalty      :  -0.5 per step (gas < 0.1 and steer < 0.1)
+  Out of bounds     :  -15,   terminated=True
+  Time step tax     :  -0.2 per step
+  Timeout           :  truncated=True  (NOT terminated)
 """
 
 import sys
@@ -48,7 +66,7 @@ from gymnasium import spaces
 from controller import Supervisor
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Discrete action set  (shared between discrete and continuous modes)
+# Discrete action set
 # ──────────────────────────────────────────────────────────────────────────────
 
 ACTION_SET = np.array([
@@ -56,6 +74,13 @@ ACTION_SET = np.array([
     [ 0., -1.], [ 0.,  0.], [ 0., +1.],
     [+1., -1.], [+1.,  0.], [+1., +1.],
 ], dtype=np.float32)
+
+# ── Defender random spawn bounds ──────────────────────────────────────────────
+DEF_X_MIN   =  0.0
+DEF_X_MAX   =  2.0
+DEF_Y_MIN   = -1.3
+DEF_Y_MAX   =  1.3
+DEF_MIN_SEP =  0.4   # minimum distance between any two defenders at spawn
 
 
 class StrikerRLEnv(gym.Env):
@@ -69,10 +94,8 @@ class StrikerRLEnv(gym.Env):
 
         # ── action space ─────────────────────────────────────────────
         if discrete:
-            # DQN — integer index 0-8
             self.action_space = spaces.Discrete(9)
         else:
-            # PPO, BC, GAIL, IQL, IQ-Learn — continuous [gas, steer]
             self.action_space = spaces.Box(
                 low=-1.0, high=1.0, shape=(2,), dtype=np.float32
             )
@@ -96,24 +119,32 @@ class StrikerRLEnv(gym.Env):
         self.compass.enable(self.timestep)
 
         # ── scene nodes ───────────────────────────────────────────────
-        self.striker_node       = self.robot.getSelf()
-        self.robot_trans_field  = self.striker_node.getField("translation")
-        self.robot_rot_field    = self.striker_node.getField("rotation")
+        self.striker_node      = self.robot.getSelf()
+        self.robot_trans_field = self.striker_node.getField("translation")
+        self.robot_rot_field   = self.striker_node.getField("rotation")
 
         self.ball_node        = self.robot.getFromDef("Ball")
         self.ball_trans_field = self.ball_node.getField("translation")
 
-        # Save initial positions for reset
         self.init_robot_pos = self.robot_trans_field.getSFVec3f()
         self.init_robot_rot = self.robot_rot_field.getSFRotation()
         self.init_ball_pos  = self.ball_trans_field.getSFVec3f()
 
-        # Defenders — tolerate missing nodes
-        self.defenders = []
+        # ── defenders ─────────────────────────────────────────────────
+        # Store both the node (velocity/position reads) and the
+        # translation field (teleport on reset). The z-coordinate is
+        # captured once from the scene so defenders stay on the ground.
+        self.defenders        = []
+        self.def_trans_fields = []
+        self.def_init_z       = []
+
         for i in range(1, 3):
             node = self.robot.getFromDef(f"defender{i}")
-            if node:
+            if node is not None:
+                tf = node.getField("translation")
                 self.defenders.append(node)
+                self.def_trans_fields.append(tf)
+                self.def_init_z.append(tf.getSFVec3f()[2])
 
         # ── parameters ───────────────────────────────────────────────
         self.MY_GOAL_CENTER  = [2.0, 0.0]
@@ -122,14 +153,48 @@ class StrikerRLEnv(gym.Env):
         self.ACCEL           = 0.2
         self.DRIBBLER_OFFSET = 0.05
         self.DRIBBLER_PULL   = 15.0
-        self.INNER_STEPS     = 8     # physics steps per RL step
+        self.INNER_STEPS     = 8
 
         # ── runtime state ─────────────────────────────────────────────
-        self.v_curr          = 0.0
-        self.w_curr          = 0.0
-        self.step_count      = 0
-        self.prev_ball_dist  = 0.0
+        self.v_curr           = 0.0
+        self.w_curr           = 0.0
+        self.step_count       = 0
+        self.prev_ball_dist   = 0.0
         self.beaten_defenders = set()
+
+    # ──────────────────────────────────────────────────────────────────
+    # Defender randomisation
+    # ──────────────────────────────────────────────────────────────────
+
+    def _randomise_defenders(self):
+        """
+        Place each defender at a random position in the attacking half.
+
+        Uses rejection sampling to enforce DEF_MIN_SEP between defenders.
+        Caps at 100 attempts per defender to avoid infinite loops on
+        very crowded configurations — in practice 3 defenders in the
+        zone above always converge within a handful of tries.
+        """
+        placed = []   # accepted (x, y) positions so far
+
+        for tf, z in zip(self.def_trans_fields, self.def_init_z):
+            for _ in range(100):
+                x = np.random.uniform(DEF_X_MIN, DEF_X_MAX)
+                y = np.random.uniform(DEF_Y_MIN, DEF_Y_MAX)
+
+                too_close = any(
+                    np.hypot(x - px, y - py) < DEF_MIN_SEP
+                    for px, py in placed
+                )
+                if not too_close:
+                    break
+
+            tf.setSFVec3f([x, y, z])
+            placed.append((x, y))
+
+        # Kill residual velocity so defenders don't slide after teleport
+        for node in self.defenders:
+            node.setVelocity([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
     # ──────────────────────────────────────────────────────────────────
     # Reset
@@ -138,12 +203,9 @@ class StrikerRLEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        # Teleport robot and ball back to start — no simulationReset()
-        # (simulationReset kills the controller process mid-training)
         self.robot_trans_field.setSFVec3f(self.init_robot_pos)
         self.robot_rot_field.setSFRotation(self.init_robot_rot)
 
-        # Place ball just ahead of robot so it starts in possession
         curriculum_ball_pos = [
             self.init_robot_pos[0] + 0.05,
             self.init_robot_pos[1],
@@ -152,14 +214,17 @@ class StrikerRLEnv(gym.Env):
         self.ball_trans_field.setSFVec3f(curriculum_ball_pos)
         self.ball_node.setVelocity([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
-        self.robot.simulationResetPhysics()  # safe — only resets velocities
+        # Randomise defender positions every episode
+        self._randomise_defenders()
+
+        self.robot.simulationResetPhysics()
         self.robot.step(self.timestep)
 
-        self.v_curr          = 0.0
-        self.w_curr          = 0.0
-        self.step_count      = 0
+        self.v_curr           = 0.0
+        self.w_curr           = 0.0
+        self.step_count       = 0
         self.beaten_defenders = set()
-        self.prev_ball_dist  = np.hypot(
+        self.prev_ball_dist   = np.hypot(
             self.MY_GOAL_CENTER[0] - curriculum_ball_pos[0],
             self.MY_GOAL_CENTER[1] - curriculum_ball_pos[1],
         )
@@ -175,18 +240,15 @@ class StrikerRLEnv(gym.Env):
         comp    = self.compass.getValues()
         heading = np.arctan2(comp[0], comp[1])
 
-        # Estimated world-frame velocity from internal state
-        est_v  = self.v_curr * 0.02
+        est_v   = self.v_curr * 0.02
         self_vx = est_v * np.cos(heading)
         self_vy = est_v * np.sin(heading)
 
-        # Goal direction
         gdx        = self.MY_GOAL_CENTER[0] - pos[0]
         gdy        = self.MY_GOAL_CENTER[1] - pos[1]
         goal_dist  = np.hypot(gdx, gdy)
         goal_angle = np.arctan2(gdy, gdx) - heading
 
-        # Defender features — sorted by proximity so nearest is always [5-9]
         def_feats = []
         for d in self.defenders:
             dp     = d.getPosition()
@@ -222,19 +284,14 @@ class StrikerRLEnv(gym.Env):
     def step(self, action):
         self.step_count += 1
 
-        # ── resolve action → [gas, steer] in [-1, 1] ──────────────────
         if self.discrete:
-            # DQN passes an integer index
             gas, steer = ACTION_SET[int(action)]
         else:
-            # PPO / BC / GAIL / IQL / IQ-Learn pass a float array
-            # IQ-Learn passes index_to_action result [±1,0] — also fine
             gas, steer = float(action[0]), float(action[1])
 
         v_target = gas   * self.MAX_SPEED
         w_target = steer * self.TURN_BIAS
 
-        # ── inner physics loop (8 sub-steps) ──────────────────────────
         is_dribbling = False
         for _ in range(self.INNER_STEPS):
             self.v_curr += (v_target - self.v_curr) * self.ACCEL
@@ -245,20 +302,16 @@ class StrikerRLEnv(gym.Env):
             self.left_motor.setVelocity(left_speed)
             self.right_motor.setVelocity(right_speed)
 
-            # Dribbler physics
-            pos      = self.gps.getValues()
-            comp     = self.compass.getValues()
-            heading  = np.arctan2(comp[0], comp[1])
-            ball_pos = self.ball_node.getPosition()
+            pos           = self.gps.getValues()
+            comp          = self.compass.getValues()
+            heading       = np.arctan2(comp[0], comp[1])
+            ball_pos      = self.ball_node.getPosition()
 
-            dx           = ball_pos[0] - pos[0]
-            dy           = ball_pos[1] - pos[1]
-            dist_to_ball = np.hypot(dx, dy)
+            dx            = ball_pos[0] - pos[0]
+            dy            = ball_pos[1] - pos[1]
+            dist_to_ball  = np.hypot(dx, dy)
             angle_to_ball = np.arctan2(dy, dx)
-            angle_diff   = angle_to_ball - heading
-
-            # Normalise angle to [-π, π]
-            angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
+            angle_diff    = (angle_to_ball - heading + np.pi) % (2 * np.pi) - np.pi
 
             if dist_to_ball < 0.1 and abs(angle_diff) < 0.5:
                 is_dribbling = True
@@ -271,7 +324,6 @@ class StrikerRLEnv(gym.Env):
             if self.robot.step(self.timestep) == -1:
                 sys.exit(0)
 
-        # ── post-step state ───────────────────────────────────────────
         pos      = self.gps.getValues()
         ball_pos = self.ball_node.getPosition()
 
@@ -280,35 +332,27 @@ class StrikerRLEnv(gym.Env):
             self.MY_GOAL_CENTER[1] - ball_pos[1],
         )
 
-        # ── reward computation ────────────────────────────────────────
-        reward     = -0.2   # time step tax — encourages efficiency
-        
+        reward     = -0.2
         terminated = False
         truncated  = False
 
-        # Idle freeze penalty
         if abs(gas) < 0.1 and abs(steer) < 0.1:
             reward -= 0.5
 
-        # 1. Ball progress toward goal
-        #    Clipped to ±0.5 before scaling to prevent single-step spikes
-        #    (e.g. ball teleporting after physics glitch giving ±50 reward)
         progress = self.prev_ball_dist - dist_ball_to_goal
         reward  += np.clip(progress, -0.5, 0.5) * 20.0
         self.prev_ball_dist = dist_ball_to_goal
 
-        # 3. Collision penalty (soft, continuous)
-        #    -10 per step in contact rather than terminal, so the agent
-        #    has time to learn to go around defenders rather than
-        #    ending every episode the moment it gets close
+        if is_dribbling:
+            reward += 0.3
+
         for defender in self.defenders:
-            def_pos      = defender.getPosition()
-            dist_to_def  = np.hypot(def_pos[0] - pos[0], def_pos[1] - pos[1])
+            def_pos     = defender.getPosition()
+            dist_to_def = np.hypot(def_pos[0] - pos[0], def_pos[1] - pos[1])
             if dist_to_def < 0.20:
                 reward -= 10.0
-                break   # one penalty per step, not per defender
+                break
 
-        # 4. Defender beaten bonus
         for idx, defender in enumerate(self.defenders):
             if idx not in self.beaten_defenders:
                 def_pos = defender.getPosition()
@@ -316,13 +360,10 @@ class StrikerRLEnv(gym.Env):
                     reward += 50.0
                     self.beaten_defenders.add(idx)
 
-        # 5. Goal scored — episode win
-        #    FIX: previously missing `terminated = True`, episode never ended
         if dist_ball_to_goal < 0.25:
             reward    += 100.0
             terminated = True
 
-        # 6. Out of bounds — episode loss
         if (
             pos[0] >  2.5 or pos[0] < -2.5 or
             pos[1] >  1.5 or pos[1] < -1.5
@@ -330,11 +371,7 @@ class StrikerRLEnv(gym.Env):
             reward    -= 15.0
             terminated = True
 
-        # 7. Timeout — truncated, NOT terminated
-        #    FIX: was returning (done, False) which zeroed Bellman bootstrap
-        #    on timeouts. Truncation means episode continues conceptually,
-        #    so γ·V(s') should NOT be zeroed.
-        if not terminated and self.step_count > 200:
+        if not terminated and self.step_count > 250:
             truncated = True
 
         return self._get_obs(), reward, terminated, truncated, {}

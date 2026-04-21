@@ -1,11 +1,44 @@
+"""
+BC evaluation — 100 episodes with final metrics
+================================================
+
+Loads bc_striker_brain_best.pt and runs the greedy policy
+(argmax over logits) for exactly 100 episodes, then prints
+a full metrics summary in the same format as all other
+play scripts for direct comparison.
+
+Metrics reported
+-----------------
+  Success rate     — % episodes where ball reached the goal
+  Failure rate     — % terminated by collision / out of bounds
+  Timeout rate     — % that hit the step limit
+  Avg total reward — mean episode return ± std (split by outcome)
+  Avg episode steps
+  Avg defenders beaten per episode
+  Action distribution — usage % for each of the 9 discrete actions
+"""
+
+from __future__ import annotations
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from striker_env import StrikerRLEnv
+
+from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 1. Universal Network Architecture
+# Config
 # ──────────────────────────────────────────────────────────────────────────────
+
+CKPT_PATH   = "type_2_bc.pt"
+N_EPISODES  = 100
+GOAL_THRESH = 0.25
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Network — must match train_bc.py exactly
+# ──────────────────────────────────────────────────────────────────────────────
+
 def _mlp(in_dim: int, out_dim: int, hidden: list[int]) -> nn.Sequential:
     sizes  = [in_dim] + hidden + [out_dim]
     layers = []
@@ -16,8 +49,8 @@ def _mlp(in_dim: int, out_dim: int, hidden: list[int]) -> nn.Sequential:
             layers.append(nn.ReLU())
     return nn.Sequential(*layers)
 
-class DiscreteNetwork(nn.Module):
-    """Can act as either a Q-Network (RL) or a Classification Network (BC)"""
+
+class BCPolicy(nn.Module):
     def __init__(self, obs_dim: int, n_actions: int, hidden: list[int]):
         super().__init__()
         self.net = _mlp(obs_dim, n_actions, hidden)
@@ -25,58 +58,165 @@ class DiscreteNetwork(nn.Module):
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         return self.net(obs)
 
+
 # ──────────────────────────────────────────────────────────────────────────────
-# 2. Main Play Loop
+# Evaluation
 # ──────────────────────────────────────────────────────────────────────────────
-def play():
-    # Toggle this variable to test different brains!
-    checkpoint_file = "bc_striker_brain.pt"  # or "iq_striker_brain_best.pt"
-    
-    print(f"--- LOADING BRAIN ({checkpoint_file}) ---")
-    
-    ckpt = torch.load(checkpoint_file, map_location="cpu", weights_only=False)
-    ACTION_SET = ckpt["action_set"]
-    env = StrikerRLEnv()
-    
-    # Instantiate the brain
-    net = DiscreteNetwork(ckpt["obs_dim"], ckpt["n_actions"], ckpt["hidden"])
-    
-    # --- THE SMART LOADER ---
-    if "q1" in ckpt:
-        print("--> Detected Double-Q Architecture (IQ-Learn)")
-        # During play, we don't need both Q-networks. Just load Q1 to make decisions.
-        net.load_state_dict(ckpt["q1"])
-    elif "q_net" in ckpt:
-        print("--> Detected Single-Q Architecture (Behavioral Cloning / Old IQ)")
-        net.load_state_dict(ckpt["q_net"])
-    else:
-        raise ValueError("Unknown checkpoint format! Cannot find 'q1' or 'q_net'.")
-        
-    net.eval() # Lock network into evaluation mode
-    print("--- BRAIN READY. STARTING MATCH ---")
-    
-    obs, _ = env.reset()
-    episode_reward = 0.0
-    episode_count  = 0
 
-    while True:
-        with torch.no_grad():
-            obs_t  = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
-            
-            # This outputs Q-values for RL, or Classification Logits for BC. 
-            # In both cases, argmax() gives us the correct button!
-            outputs = net(obs_t)
-            best_action_idx = outputs.argmax(dim=-1).item()
-            action = ACTION_SET[best_action_idx].copy()
+def evaluate():
+    print("=" * 60)
+    print(f"BC Evaluation  —  {N_EPISODES} episodes")
+    print(f"Checkpoint: {CKPT_PATH}")
+    print("=" * 60)
 
-        obs, reward, terminated, truncated, _ = env.step(action)
-        episode_reward += reward
+    # ── load checkpoint ───────────────────────────────────────────────
+    ckpt       = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
+    obs_dim    = ckpt["obs_dim"]
+    n_actions  = ckpt["n_actions"]
+    hidden     = ckpt["hidden"]
+    action_set = ckpt["action_set"]
 
-        if terminated or truncated:
-            episode_count += 1
-            print(f"--> Episode {episode_count} finished. Total score: {episode_reward:.2f}")
-            obs, _ = env.reset()
-            episode_reward = 0.0
+    policy = BCPolicy(obs_dim, n_actions, hidden)
+    policy.load_state_dict(ckpt["policy"])
+    policy.eval()
+
+    print(f"[Model]  obs_dim={obs_dim}  n_actions={n_actions}  hidden={hidden}")
+
+    # ── environment ───────────────────────────────────────────────────
+    env = StrikerRLEnv(discrete=True)
+
+    # ── per-episode trackers ──────────────────────────────────────────
+    ep_rewards          = []
+    ep_steps            = []
+    ep_outcomes         = []
+    ep_defenders_beaten = []
+    ep_action_counts    = []
+
+    for ep in range(1, N_EPISODES + 1):
+        np.random.seed(1000 + ep)                   # Force Numpy's global seed
+        obs, _         = env.reset(seed=1000 + ep)
+        ep_reward      = 0.0
+        ep_step        = 0
+        defenders_beat = 0
+        action_counts  = [0] * n_actions
+        prev_beaten    = len(env.beaten_defenders)
+
+        while True:
+            with torch.no_grad():
+                obs_t           = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
+                logits          = policy(obs_t)
+                best_action_idx = logits.argmax(dim=-1).item()
+
+            action_counts[best_action_idx] += 1
+
+            obs, reward, terminated, truncated, _ = env.step(best_action_idx)
+            ep_reward += reward
+            ep_step   += 1
+
+            new_beaten      = len(env.beaten_defenders) - prev_beaten
+            defenders_beat += max(new_beaten, 0)
+            prev_beaten     = len(env.beaten_defenders)
+
+            if terminated or truncated:
+                ball_pos     = env.ball_node.getPosition()
+                dist_to_goal = np.hypot(
+                    env.MY_GOAL_CENTER[0] - ball_pos[0],
+                    env.MY_GOAL_CENTER[1] - ball_pos[1],
+                )
+                if terminated and dist_to_goal < GOAL_THRESH:
+                    outcome = "goal"
+                elif truncated:
+                    outcome = "timeout"
+                else:
+                    outcome = "fail"
+                break
+
+        dominant_idx    = int(np.argmax(action_counts))
+        dominant_action = action_set[dominant_idx]
+
+        ep_rewards.append(ep_reward)
+        ep_steps.append(ep_step)
+        ep_outcomes.append(outcome)
+        ep_defenders_beaten.append(defenders_beat)
+        ep_action_counts.append(action_counts)
+
+        print(
+            f"  ep {ep:>3}/{N_EPISODES}  "
+            f"reward={ep_reward:>7.2f}  "
+            f"steps={ep_step:>3}  "
+            f"beaten={defenders_beat}  "
+            f"dominant_action={dominant_action}  "
+            f"[{outcome.upper()}]"
+        )
+
+    env.close()
+
+    # ── aggregate metrics ─────────────────────────────────────────────
+    n_goal    = ep_outcomes.count("goal")
+    n_fail    = ep_outcomes.count("fail")
+    n_timeout = ep_outcomes.count("timeout")
+
+    success_rate = 100.0 * n_goal    / N_EPISODES
+    fail_rate    = 100.0 * n_fail    / N_EPISODES
+    timeout_rate = 100.0 * n_timeout / N_EPISODES
+    avg_reward   = np.mean(ep_rewards)
+    std_reward   = np.std(ep_rewards)
+    avg_steps    = np.mean(ep_steps)
+    avg_beaten   = np.mean(ep_defenders_beaten)
+
+    goal_rewards    = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "goal"]
+    fail_rewards    = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "fail"]
+    timeout_rewards = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "timeout"]
+
+    total_counts    = np.sum(ep_action_counts, axis=0)
+    total_steps_all = total_counts.sum()
+
+    print()
+    print("=" * 60)
+    print("BC  —  FINAL EVALUATION METRICS  (100 episodes)")
+    print("=" * 60)
+    print(f"  Success rate       : {success_rate:>6.1f}%   ({n_goal}/{N_EPISODES} goals)")
+    print(f"  Failure rate       : {fail_rate:>6.1f}%   ({n_fail}/{N_EPISODES})")
+    print(f"  Timeout rate       : {timeout_rate:>6.1f}%   ({n_timeout}/{N_EPISODES})")
+    print()
+    print(f"  Avg episode reward : {avg_reward:>7.2f}  ± {std_reward:.2f}")
+    if goal_rewards:
+        print(f"    └ goals only     : {np.mean(goal_rewards):>7.2f}  ± {np.std(goal_rewards):.2f}")
+    if fail_rewards:
+        print(f"    └ failures only  : {np.mean(fail_rewards):>7.2f}  ± {np.std(fail_rewards):.2f}")
+    if timeout_rewards:
+        print(f"    └ timeouts only  : {np.mean(timeout_rewards):>7.2f}  ± {np.std(timeout_rewards):.2f}")
+    print()
+    print(f"  Avg episode steps  : {avg_steps:>7.1f}")
+    print(f"  Avg defenders beat : {avg_beaten:>7.2f}")
+    print()
+    print("  Action distribution across all episodes:")
+    for idx, (action_vec, count) in enumerate(zip(action_set, total_counts)):
+        pct = 100.0 * count / total_steps_all if total_steps_all > 0 else 0
+        bar = "█" * int(pct / 2)
+        print(f"    idx {idx}  {action_vec}  {pct:>5.1f}%  {bar}")
+    print("=" * 60)
+
+    # ── covariate shift diagnostic ─────────────────────────────────
+    # BC's core weakness: high timeout rate relative to other methods
+    # indicates the policy is getting stuck in unseen states
+    if timeout_rate > fail_rate + 20:
+        print()
+        print("[Diagnostic]  High timeout rate vs failure rate suggests")
+        print("  covariate shift — policy reaches unseen states and freezes.")
+        print("  Consider: more diverse demonstrations, DAgger, or switching")
+        print("  to SQIL/IQ-Learn which correct for this via env interaction.")
+
+    print()
+    print("CSV row (algorithm, success%, avg_reward, avg_steps, avg_beaten):")
+    print(
+        f"BC,"
+        f"{success_rate:.1f},"
+        f"{avg_reward:.2f},"
+        f"{avg_steps:.1f},"
+        f"{avg_beaten:.2f}"
+    )
+
 
 if __name__ == "__main__":
-    play()
+    evaluate()

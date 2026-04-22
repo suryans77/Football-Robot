@@ -207,7 +207,7 @@ class StrikerRLEnv(gym.Env):
         self.robot_rot_field.setSFRotation(self.init_robot_rot)
 
         curriculum_ball_pos = [
-            self.init_robot_pos[0] + 0.05,
+            self.init_robot_pos[0] + 0.06,
             self.init_robot_pos[1],
             self.init_ball_pos[2],
         ]
@@ -349,8 +349,8 @@ class StrikerRLEnv(gym.Env):
         for defender in self.defenders:
             def_pos     = defender.getPosition()
             dist_to_def = np.hypot(def_pos[0] - pos[0], def_pos[1] - pos[1])
-            if dist_to_def < 0.20:
-                reward -= 10.0
+            if dist_to_def < 0.1:
+                reward -= 5.0
                 break
 
         for idx, defender in enumerate(self.defenders):
@@ -365,13 +365,13 @@ class StrikerRLEnv(gym.Env):
             terminated = True
 
         if (
-            pos[0] >  2.5 or pos[0] < -2.5 or
-            pos[1] >  1.5 or pos[1] < -1.5
+            pos[0] >  2.0 or pos[0] < -2.0 or
+            pos[1] >  1.3 or pos[1] < -1.3
         ):
-            reward    -= 15.0
+            reward    -= 100.0
             terminated = True
 
-        if not terminated and self.step_count > 250:
+        if not terminated and self.step_count > 200:
             truncated = True
 
         return self._get_obs(), reward, terminated, truncated, {}

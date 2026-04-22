@@ -31,7 +31,7 @@ from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 # Config
 # ──────────────────────────────────────────────────────────────────────────────
 
-CKPT_PATH   = "type_2_pureIQ.pt"
+CKPT_PATH   = "full_pureIQ.pt"
 N_EPISODES  = 100
 GOAL_THRESH = 0.25   # must match striker_env
 
@@ -98,8 +98,8 @@ def evaluate():
     ep_action_counts    = []
 
     for ep in range(1, N_EPISODES + 1):
-        np.random.seed(42 + ep)                   # Force Numpy's global seed
-        obs, _         = env.reset(seed=42 + ep)
+        np.random.seed(1000 + ep)                   # Force Numpy's global seed
+        obs, _         = env.reset(seed=1000 + ep)
         ep_reward      = 0.0
         ep_step        = 0
         defenders_beat = 0

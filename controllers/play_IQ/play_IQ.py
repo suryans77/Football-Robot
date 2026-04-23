@@ -31,7 +31,7 @@ from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 # Config
 # ──────────────────────────────────────────────────────────────────────────────
 
-CKPT_PATH   = "full_pureIQ.pt"
+CKPT_PATH   = "full_pureIQ_best.pt"
 N_EPISODES  = 100
 GOAL_THRESH = 0.25   # must match striker_env
 

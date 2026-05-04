@@ -1,21 +1,11 @@
 """
-Pure IQ-Learn evaluation — 100 episodes with final metrics
+DQN fine-tuned evaluation — 100 episodes with full metrics
 ===========================================================
 
-Loads iq_pure_brain_best.pt and runs the greedy policy
-(argmax over min(Q1, Q2)) for exactly 100 episodes, then
-prints a full metrics summary in the same format as
-play_ppo.py and play_dqn.py for direct comparison.
+Loads dqn_finetuned_best.pt (same checkpoint format as IQ-Learn)
+and runs the greedy policy for exactly 100 episodes.
 
-Metrics reported
------------------
-  Success rate     — % of episodes where ball reached the goal
-  Failure rate     — % terminated by collision / out of bounds
-  Timeout rate     — % that hit the step limit
-  Avg total reward — mean episode return ± std
-  Avg episode steps
-  Avg defenders beaten per episode
-  Action distribution — which of the 9 actions was used most
+Metrics match all other play scripts for direct comparison.
 """
 
 from __future__ import annotations
@@ -23,22 +13,13 @@ from __future__ import annotations
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Config
-# ──────────────────────────────────────────────────────────────────────────────
-
-CKPT_PATH   = "type_2_pureIQ.pt"
+CKPT_PATH   = "dqn_finetuned.pt"
 N_EPISODES  = 100
-GOAL_THRESH = 0.25   # must match striker_env
+GOAL_THRESH = 0.25
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Network — must match pure_iq.py exactly
-# ──────────────────────────────────────────────────────────────────────────────
 
 def _mlp(in_dim: int, out_dim: int, hidden: list[int]) -> nn.Sequential:
     sizes  = [in_dim] + hidden + [out_dim]
@@ -52,50 +33,38 @@ def _mlp(in_dim: int, out_dim: int, hidden: list[int]) -> nn.Sequential:
 
 
 class DiscreteQNetwork(nn.Module):
-    def __init__(self, obs_dim: int, n_actions: int, hidden: list[int]):
+    def __init__(self, obs_dim, n_actions, hidden):
         super().__init__()
         self.net = _mlp(obs_dim, n_actions, hidden)
 
-    def forward(self, obs: torch.Tensor) -> torch.Tensor:
+    def forward(self, obs):
         return self.net(obs)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Evaluation loop
-# ──────────────────────────────────────────────────────────────────────────────
-
 def evaluate():
     print("=" * 60)
-    print(f"Pure IQ-Learn Evaluation  —  {N_EPISODES} episodes")
+    print(f"DQN Fine-tuned Evaluation  —  {N_EPISODES} episodes")
     print(f"Checkpoint: {CKPT_PATH}")
     print("=" * 60)
 
-    # ── load checkpoint ───────────────────────────────────────────────
-    ckpt      = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
-    obs_dim   = ckpt["obs_dim"]
-    n_actions = ckpt["n_actions"]
-    hidden    = ckpt["hidden"]
+    ckpt       = torch.load(CKPT_PATH, map_location="cpu", weights_only=False)
+    obs_dim    = ckpt["obs_dim"]
+    n_actions  = ckpt["n_actions"]
+    hidden     = ckpt["hidden"]
+    action_set = ckpt["action_set"]
 
     q1 = DiscreteQNetwork(obs_dim, n_actions, hidden)
     q2 = DiscreteQNetwork(obs_dim, n_actions, hidden)
     q1.load_state_dict(ckpt["q1"])
     q2.load_state_dict(ckpt["q2"])
-    q1.eval()
-    q2.eval()
+    q1.eval(); q2.eval()
 
     print(f"[Model]  obs_dim={obs_dim}  n_actions={n_actions}  hidden={hidden}")
 
-    # ── environment ───────────────────────────────────────────────────
-    # discrete=True so the env accepts integer action indices directly,
-    # consistent with how actions are resolved during training
     env = StrikerRLEnv(discrete=True)
 
-    # ── per-episode trackers ──────────────────────────────────────────
-    ep_rewards          = []
-    ep_steps            = []
-    ep_outcomes         = []   # "goal" | "fail" | "timeout"
-    ep_defenders_beaten = []
-    ep_action_counts    = []
+    ep_rewards, ep_steps, ep_outcomes = [], [], []
+    ep_defenders_beaten, ep_action_counts = [], []
 
     for ep in range(1, N_EPISODES + 1):
         np.random.seed(1000 + ep)                   # Force Numpy's global seed
@@ -108,14 +77,12 @@ def evaluate():
 
         while True:
             with torch.no_grad():
-                obs_t   = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
-                # Greedy: argmax over min(Q1, Q2) — same as training inference
-                q_vals  = torch.min(q1(obs_t), q2(obs_t))
-                act_idx = q_vals.argmax(dim=-1).item()
+                obs_t           = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
+                q_vals          = torch.min(q1(obs_t), q2(obs_t))
+                best_action_idx = q_vals.argmax(dim=-1).item()
 
-            action_counts[act_idx] += 1
-
-            obs, reward, terminated, truncated, _ = env.step(act_idx)
+            action_counts[best_action_idx] += 1
+            obs, reward, terminated, truncated, _ = env.step(best_action_idx)
             ep_reward += reward
             ep_step   += 1
 
@@ -138,7 +105,7 @@ def evaluate():
                 break
 
         dominant_idx    = int(np.argmax(action_counts))
-        dominant_action = ACTION_SET[dominant_idx]
+        dominant_action = action_set[dominant_idx]
 
         ep_rewards.append(ep_reward)
         ep_steps.append(ep_step)
@@ -151,13 +118,12 @@ def evaluate():
             f"reward={ep_reward:>7.2f}  "
             f"steps={ep_step:>3}  "
             f"beaten={defenders_beat}  "
-            f"dominant_action={dominant_action}  "
+            f"dominant={dominant_action}  "
             f"[{outcome.upper()}]"
         )
 
     env.close()
 
-    # ── aggregate metrics ────────────────────────────────────────────
     n_goal    = ep_outcomes.count("goal")
     n_fail    = ep_outcomes.count("fail")
     n_timeout = ep_outcomes.count("timeout")
@@ -170,18 +136,16 @@ def evaluate():
     avg_steps    = np.mean(ep_steps)
     avg_beaten   = np.mean(ep_defenders_beaten)
 
-    # Reward breakdown by outcome
     goal_rewards    = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "goal"]
     fail_rewards    = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "fail"]
     timeout_rewards = [r for r, o in zip(ep_rewards, ep_outcomes) if o == "timeout"]
 
-    # Action distribution
     total_counts    = np.sum(ep_action_counts, axis=0)
     total_steps_all = total_counts.sum()
 
     print()
     print("=" * 60)
-    print("Pure IQ-Learn  —  FINAL EVALUATION METRICS  (100 episodes)")
+    print("DQN Fine-tuned  —  FINAL EVALUATION METRICS  (100 episodes)")
     print("=" * 60)
     print(f"  Success rate       : {success_rate:>6.1f}%   ({n_goal}/{N_EPISODES} goals)")
     print(f"  Failure rate       : {fail_rate:>6.1f}%   ({n_fail}/{N_EPISODES})")
@@ -199,17 +163,16 @@ def evaluate():
     print(f"  Avg defenders beat : {avg_beaten:>7.2f}")
     print()
     print("  Action distribution across all episodes:")
-    for idx, (action_vec, count) in enumerate(zip(ACTION_SET, total_counts)):
+    for idx, (action_vec, count) in enumerate(zip(action_set, total_counts)):
         pct = 100.0 * count / total_steps_all if total_steps_all > 0 else 0
         bar = "█" * int(pct / 2)
         print(f"    idx {idx}  {action_vec}  {pct:>5.1f}%  {bar}")
     print("=" * 60)
 
-    # ── CSV row — same format as play_ppo.py and play_dqn.py ─────────
     print()
     print("CSV row (algorithm, success%, avg_reward, avg_steps, avg_beaten):")
     print(
-        f"IQ-Learn (Pure),"
+        f"DQN-finetuned,"
         f"{success_rate:.1f},"
         f"{avg_reward:.2f},"
         f"{avg_steps:.1f},"

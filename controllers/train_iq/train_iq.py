@@ -12,7 +12,7 @@ Fixes for Q-value explosion and policy regression
 
 2. Double Q-networks (Q1, Q2)
    Bellman targets use min(Q1_tgt, Q2_tgt) — halves overestimation bias.
-   Both networks are trained jointly with the same IQ+CQL loss.
+   Both networks are trained jointly with the same IQ + CQL loss.
 
 3. Best-checkpoint saving
    Tracks the best `expert_br` (mean Bellman residual on expert data).
@@ -98,6 +98,46 @@ CFG = dict(
     log_window          = 500,
 )
 
+def _run_eval_discrete(env, q1, q2, min_q_fn, index_to_action_fn,
+                       n_episodes=10):
+    """
+    Run n_episodes with greedy policy (argmax over min(Q1,Q2)).
+    Returns (n_goals, mean_reward, mean_steps).
+ 
+    Parameters
+    ----------
+    env               : StrikerRLEnv instance
+    q1, q2            : DiscreteQNetwork instances (eval mode)
+    min_q_fn          : lambda q1, q2 -> min tensor  (torch.min)
+    index_to_action_fn: converts int index → float action array
+    n_episodes        : number of evaluation episodes
+    """
+    goals     = 0
+    rewards   = []
+    steps_all = []
+ 
+    for _ in range(n_episodes):
+        obs, _ = env.reset()
+        ep_reward = 0.0
+        ep_steps  = 0
+        done      = False
+ 
+        while not done:
+            with torch.no_grad():
+                obs_t   = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
+                act_idx = min_q_fn(q1(obs_t), q2(obs_t)).argmax(dim=-1).item()
+            action  = index_to_action_fn(act_idx)
+            obs, r, terminated, truncated, _ = env.step(action)
+            ep_reward += r
+            ep_steps  += 1
+            done       = terminated or truncated
+ 
+        if env._last_episode_scored:
+            goals += 1
+        rewards.append(ep_reward)
+        steps_all.append(ep_steps)
+ 
+    return goals, float(np.mean(rewards)), float(np.mean(steps_all))
 # ──────────────────────────────────────────────────────────────────────────────
 # Replay buffer
 # ──────────────────────────────────────────────────────────────────────────────

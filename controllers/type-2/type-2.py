@@ -22,8 +22,8 @@ MY_GOAL_CENTER = [2.0, 0.0]
 DEFENSE_RADIUS = 0.6  # Distance from goal center to position the defender (tune as needed) 
 
 # --- MOVEMENT PARAMETERS ---
-MAX_SPEED = 18.0       # Upgraded to your custom e-puck max speed
-MAX_TURN = 6.0       # Max turn speed (tune as needed)
+BASE_SPEED = 18.0       # Upgraded to your custom e-puck max speed
+DIFFERENTIAL_SPEED = 6.0       # Max turn speed (tune as needed)
 
 # PD Steering Constants
 Kp = 4.0
@@ -71,11 +71,11 @@ while robot.step(timestep) != -1:
         # DRIVING: Uncap the speed!
         target_angle = math.atan2(dy, dx)
         
-        # LATE BRAKING: Go absolute MAX_SPEED until we are 15cm away, then brake hard.
+        # LATE BRAKING: Go absolute forward_speed until we are 15cm away, then brake hard.
         if dist_to_target > 0.15:
-            base_speed = MAX_SPEED
+            base_speed = BASE_SPEED
         else:
-            base_speed = MAX_SPEED * (dist_to_target / 0.15)
+            base_speed = BASE_SPEED * (dist_to_target / 0.15)
             # Ensure it doesn't drop so low that it stalls before reaching the point
             base_speed = max(base_speed, 10.0) 
 
@@ -86,7 +86,7 @@ while robot.step(timestep) != -1:
 
     error_rate = angle_error - prev_error
     turn_amount = (Kp * angle_error) + (Kd * error_rate)
-    turn_amount = max(min(turn_amount, MAX_TURN), -MAX_TURN)  # Clamp turn amount to max turn speed
+    turn_amount = max(min(turn_amount, DIFFERENTIAL_SPEED), -DIFFERENTIAL_SPEED)  # Clamp turn amount to max turn speed
     prev_error = angle_error 
     
     # 3. FORGIVING PIVOT LOGIC
@@ -107,8 +107,8 @@ while robot.step(timestep) != -1:
     left_speed = base_speed_curr - turn_curr
     right_speed = base_speed_curr + turn_curr
     
-    left_speed = max(min(left_speed, MAX_SPEED), -MAX_SPEED)
-    right_speed = max(min(right_speed, MAX_SPEED), -MAX_SPEED)
+    left_speed = max(min(left_speed, 21), -21)
+    right_speed = max(min(right_speed, 21), -21)
 
     left_motor.setVelocity(left_speed)
     right_motor.setVelocity(right_speed)

@@ -339,6 +339,10 @@ class StrikerRLEnv(gym.Env):
         if abs(gas) < 0.1 and abs(steer) < 0.1:
             reward -= 0.5
 
+        obs = self._get_obs()
+        cos_theta = obs[2]
+
+
         progress = self.prev_ball_dist - dist_ball_to_goal
         reward  += np.clip(progress, -0.5, 0.5) * 20.0
         self.prev_ball_dist = dist_ball_to_goal
@@ -346,6 +350,9 @@ class StrikerRLEnv(gym.Env):
         if is_dribbling:
             reward += 0.3
 
+        if cos_theta < 0:
+            reward -= 2.0
+        
         for defender in self.defenders:
             def_pos     = defender.getPosition()
             dist_to_def = np.hypot(def_pos[0] - pos[0], def_pos[1] - pos[1])
@@ -360,18 +367,23 @@ class StrikerRLEnv(gym.Env):
                     reward += 50.0
                     self.beaten_defenders.add(idx)
 
-        if dist_ball_to_goal < 0.25:
-            reward    += 100.0
+        # 1. GOAL CONDITION
+        if ball_pos[0] > 2.0 and (-0.25 < ball_pos[1] < 0.25):
+            reward += 100.0
             terminated = True
 
-        if (
-            pos[0] >  2.0 or pos[0] < -2.0 or
-            pos[1] >  1.3 or pos[1] < -1.3
+        # 2. OUT OF BOUNDS (BALL)
+        elif (
+            (ball_pos[0] > 2.0 and ball_pos[1] <= -0.25) or  # Missed goal (Right side)
+            (ball_pos[0] > 2.0 and ball_pos[1] >= 0.25)  or  # Missed goal (Left side)
+            (ball_pos[0] < -2.0) or                          # Went behind own baseline
+            (ball_pos[1] > 1.3)  or                          # Out on left sideline
+            (ball_pos[1] < -1.3)                             # Out on right sideline
         ):
-            reward    -= 100.0
+            reward -= 100.0
             terminated = True
 
-        if not terminated and self.step_count > 200:
+        if not terminated and self.step_count > 250:
             truncated = True
 
         return self._get_obs(), reward, terminated, truncated, {}

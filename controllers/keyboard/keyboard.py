@@ -1,5 +1,6 @@
 from controller import Supervisor, Keyboard
 import numpy as np
+import json
 
 # ================= INITIALIZATION =================
 robot = Supervisor()
@@ -29,21 +30,27 @@ for i in range(1, 4):
     node = robot.getFromDef(f"defender{i}")
     if node: defenders.append(node)
 
+attacker_node = robot.getSelf()
+teleop_data = [] # List to store all our logs
 ball_node = robot.getFromDef("Ball")
 
 # ================= PARAMETERS =================
-MAX_SPEED = 15.0
-TURN_BIAS = 5.0    
-ACCEL = 0.2       
+BASE_SPEED = 15.0           # Common-mode linear speed command
+DIFFERENTIAL_SPEED = 5.0    # Differential speed applied between wheels for rotational yaw
+ACCEL = 0.2             # Smoothing factor for motor commands (0.0 = no movement, 1.0 = instant change) 
 SHOOT_POWER = 3.0  
 LOG_FREQUENCY = 8  
 DRIBBLER_OFFSET = 0.05  # Distance from robot center to the front "notch"
 DRIBBLER_PULL = 15.0    # Strength of the sticky effect
+
+# Standard e-puck differential drive physical dimensions
+WHEEL_RADIUS = 0.02    # 'R' in standard kinematic equations (meters)
+AXLE_LENGTH = 0.052    # 'L' in standard kinematic equations (meters)
 step_counter = 0
 
 # State variables for smoothing
-v_curr = 0.0
-w_curr = 0.0
+v_curr = 0.0  # Current base speed (rad/s)
+w_curr = 0.0  # Current differential speed (rad/s)
 
 print("--- TELEOP STARTED ---")
 print("Use W/A/S/D to move. Press SPACE to shoot. Data logging active.")
@@ -81,12 +88,17 @@ while robot.step(timestep) != -1:
     # 1. Keyboard Logic
     key = keyboard.getKey()
     while key != -1:
-        if key == ord('W'): v_target = MAX_SPEED
-        elif key == ord('S'): v_target = -MAX_SPEED
+        if key == ord('W'): v_target = BASE_SPEED
+        elif key == ord('S'): v_target = -BASE_SPEED
             
-        if key == ord('A'): w_target = TURN_BIAS   
-        elif key == ord('D'): w_target = -TURN_BIAS  
-            
+        if key == ord('A'): w_target = DIFFERENTIAL_SPEED
+        elif key == ord('D'): w_target = -DIFFERENTIAL_SPEED  
+
+
+
+
+
+######################################  not our focus currently (shooting logic) ######################################  
         # Shooting (Overrides Dribbling)
         if key == ord(' '):
             if is_dribbling:
@@ -97,9 +109,9 @@ while robot.step(timestep) != -1:
                 kick_vx = np.cos(heading) * SHOOT_POWER
                 kick_vy = np.sin(heading) * SHOOT_POWER
                 ball_node.setVelocity([kick_vx, kick_vy, 0.5, 0.0, 0.0, 0.0])
-                    
+#######################################################################################################################                    
         key = keyboard.getKey()
-
+########################################## sticking ball to the front of the robot ####################################
     # --- APPLY PSEUDO-DRIBBLER PHYSICS ---
     if is_dribbling and shoot_flag == 0:
         # Calculate the ideal Cartesian coordinate of the dribbler notch
@@ -112,26 +124,67 @@ while robot.step(timestep) != -1:
         
         # Lock the ball's velocity to pull it into the notch, killing erratic spin
         ball_node.setVelocity([pull_vx, pull_vy, 0.0, 0.0, 0.0, 0.0])
+#######################################################################################################################
 
-    # 2. Apply Motor Smoothing 
+
+
+
+    # 2. Apply Motor Smoothing
     v_curr += (v_target - v_curr) * ACCEL
     w_curr += (w_target - w_curr) * ACCEL
     
-    left_speed = max(min(v_curr - w_curr, 20.0), -20.0)
-    right_speed = max(min(v_curr + w_curr, 20.0), -20.0)
+    # Calculate final wheel angular velocities (rad/s)
+    # left_omega = v - w, right_omega = v + w
+    # The 'w' component is the differential speed, increasing the speed of one wheel 
+    # relative to the other to enable turning without lateral strafing.
+    left_omega = max(min(v_curr - w_curr, 21.0), -21.0)
+    right_omega = max(min(v_curr + w_curr, 21.0), -21.0)
 
-    left_motor.setVelocity(left_speed)
-    right_motor.setVelocity(right_speed)
+    left_motor.setVelocity(left_omega)
+    right_motor.setVelocity(right_omega)
     
     # 3. Data Logging
     if step_counter % LOG_FREQUENCY == 0:
-        def_positions = [d.getPosition()[:2] for d in defenders]
+        # --- ATTACKER MATH ---
+        att_vel = attacker_node.getVelocity() # Returns Cartesian [vx, vy, vz, wx, wy, wz]
+        
+        # INVERSE KINEMATICS (Linear): 
+        # Project global 2D Cartesian velocity onto the local forward axis (X)
+        # Then divide by wheel radius (R) to find the equivalent common-mode wheel speed
+        att_v_linear = att_vel[0] * np.cos(heading) + att_vel[1] * np.sin(heading)
+        att_actual_v = att_v_linear / WHEEL_RADIUS
+        
+        # INVERSE KINEMATICS (Angular):
+        # Extract chassis yaw rate (wz) and apply standard differential drive formula:
+        # Differential wheel speed (w) = (Yaw_Rate * L) / (2 * R)
+        att_yaw_rate = att_vel[5]
+        att_actual_w = (att_yaw_rate * AXLE_LENGTH) / (2.0 * WHEEL_RADIUS)
+        
+        # --- DEFENDER MATH ---
+        def_vel = defenders[0].getVelocity()
+        
+        #absolute 3x3 rotation matrix from the physics engine
+        def_rot = defenders[0].getOrientation()
+        
+        # In Webots, the robot's local forward axis (X) is stored in matrix indices 0 and 3
+        # We mathematically project the global X/Y velocity onto this forward vector
+        def_v_linear = def_vel[0] * def_rot[0] + def_vel[1] * def_rot[3]
+        def_actual_v = def_v_linear / WHEEL_RADIUS
+        
+        def_yaw_rate = def_vel[5]
+        def_actual_w = (def_yaw_rate * AXLE_LENGTH) / (2.0 * WHEEL_RADIUS)
         
         log_entry = {
-            "pos": [round(p, 2) for p in pos[:2]],
-            "heading": round(heading, 2),
-            "defenders": [[round(coord, 2) for coord in d_pos] for d_pos in def_positions],
-            "action": [round(left_speed, 2), round(right_speed, 2), shoot_flag]
+            "step": step_counter,
+            "target_v": v_target,
+            "target_w": w_target,
+            "att_actual_v": att_actual_v,
+            "att_actual_w": att_actual_w,
+            "def_actual_v": def_actual_v,
+            "def_actual_w": def_actual_w
         }
-        
-        print(f"LOG | Pos: {log_entry['pos']}, H:{log_entry['heading']} | Act: {log_entry['action']}")
+        teleop_data.append(log_entry)
+
+with open("teleop_dataset.json", "w") as f:
+    json.dump(teleop_data, f, indent=4)
+print("Data saved to teleop_dataset.json!")

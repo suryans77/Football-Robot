@@ -289,8 +289,6 @@ def compute_iq_loss(q1, q2, q1_tgt, q2_tgt,
         chi2_loss   =  0.5 * (br_p ** 2).mean()
         l2_loss     =  iq_reg * (q_e ** 2).mean()
 
-        # ── NO CQL term ───────────────────────────────────────────────
-
         loss = expert_loss + chi2_loss + l2_loss
         total_loss = total_loss + loss
 
@@ -351,7 +349,6 @@ def train_iq():
     print("=" * 60)
     print("Discrete IQ-Learn (PURE)  –  Soccer Striker  (CPU)")
     print(f"Action space : {N_ACTIONS} discrete actions")
-    print("No CQL regularisation — baseline for comparison")
     print("=" * 60)
 
     device = torch.device("cpu")

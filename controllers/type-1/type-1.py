@@ -22,8 +22,8 @@ MY_GOAL_CENTER = [2.0, 0.0]
 MARKING_DIST = 0.3     # The distance to maintain from the attacker in the 1.0-1.5m zone
 
 # --- MOVEMENT PARAMETERS ---
-MAX_SPEED = 18.0       
-MAX_TURN = 6.0        
+BASE_SPEED = 18.0       
+DIFFERENTIAL_SPEED = 6.0        
 
 # PD Steering & Smoothing Constants
 Kp = 3.0
@@ -94,7 +94,7 @@ while robot.step(timestep) != -1:
         # 1. RECOVERY SPRINT: We are out of position or tackling!
         # Stop looking at the ball. Look exactly at the waypoint and drive there fast.
         target_angle = angle_to_spot
-        base_speed = MAX_SPEED
+        base_speed = BASE_SPEED
             
     else:
         # 2. JOCKEY MODE: We are in the pocket!
@@ -104,7 +104,7 @@ while robot.step(timestep) != -1:
         if dist_to_target < 0.05:
             base_speed = 0.0
         else:
-            speed_mag = MAX_SPEED * (dist_to_target / 0.15)
+            speed_mag = BASE_SPEED * (dist_to_target / 0.15)
             speed_mag = max(speed_mag, 5.0)
             
             # REVERSE GEAR CHECK
@@ -124,7 +124,7 @@ while robot.step(timestep) != -1:
 
     error_rate = angle_error - prev_error
     turn_amount = (Kp * angle_error) + (Kd * error_rate)
-    turn_amount = max(min(turn_amount, MAX_TURN), -MAX_TURN)  
+    turn_amount = max(min(turn_amount, DIFFERENTIAL_SPEED), -DIFFERENTIAL_SPEED)
     prev_error = angle_error 
     
     # Forgiving Pivot Logic (Brakes if we need to make a sharp turn)
@@ -145,8 +145,8 @@ while robot.step(timestep) != -1:
     right_speed = base_speed_curr + turn_curr
     
     # Motor Clamp
-    left_speed = max(min(left_speed, MAX_SPEED), -MAX_SPEED)
-    right_speed = max(min(right_speed, MAX_SPEED), -MAX_SPEED)
+    left_speed = max(min(left_speed, 21), -21)
+    right_speed = max(min(right_speed, 21), -21)
 
     left_motor.setVelocity(left_speed)
     right_motor.setVelocity(right_speed)

@@ -15,75 +15,66 @@ right_motor = robot.getDevice("right wheel motor")
 left_motor.setPosition(float('inf'))
 right_motor.setPosition(float('inf'))
 
-striker_node = robot.getFromDef("Striker")
+ball_node = robot.getFromDef("Ball")
 
 # --- GAME PARAMETERS ---
 MY_GOAL_CENTER = [2.0, 0.0]  
 MARKING_DIST = 0.3     # The distance to maintain from the attacker in the 1.0-1.5m zone
 
 # --- MOVEMENT PARAMETERS ---
-WHEEL_RADIUS = 0.02
-AXLE_LENGTH = 0.052
-LINEAR_SPEED = 0.36       # Convert to m/s
-ANGULAR_SPEED = 5.0  # Convert to rad/s        
+BASE_SPEED = 18.0       
+DIFFERENTIAL_SPEED = 6.0        
 
 # PD Steering & Smoothing Constants
-Kp = 4.0
-Kd = 1.2              
+Kp = 3.0
+Kd = 1.0              
 ACCEL = 0.2   
 prev_error = 0.0
 base_speed_curr = 0.0
 turn_curr = 0.0
 
 while robot.step(timestep) != -1:
-    if striker_node is None: continue
+    if ball_node is None: continue
 
     # Get Sensor Data
     curr_pos = gps.getValues()
-    striker_pos = striker_node.getPosition()
-    striker_compass = striker_node.getOrientation()
+    ball_pos = ball_node.getPosition()
     compass_val = compass.getValues()
     my_heading = math.atan2(compass_val[0], compass_val[1])
 
-    fx = striker_compass[0]   # r00
-    fy = striker_compass[3]   # r10
-
-    #striker_pos[0] += 0.06 * fx
-    #striker_pos[1] += 0.06 * fy
-    
     # --- STRATEGY: CALCULATE DISTANCES AND VECTORS ---
-    # Vector from Striker to Goal
-    vec_bg_x = MY_GOAL_CENTER[0] - striker_pos[0]
-    vec_bg_y = MY_GOAL_CENTER[1] - striker_pos[1]
-    dist_goal_to_striker = math.hypot(vec_bg_x, vec_bg_y)
-
-    # Normalize the vector (Direction from Striker pointing towards the Goal)
-    if dist_goal_to_striker < 0.001:
+    # Vector from Ball to Goal
+    vec_bg_x = MY_GOAL_CENTER[0] - ball_pos[0]
+    vec_bg_y = MY_GOAL_CENTER[1] - ball_pos[1]
+    dist_goal_to_ball = math.hypot(vec_bg_x, vec_bg_y)
+    
+    # Normalize the vector (Direction from Ball pointing towards the Goal)
+    if dist_goal_to_ball < 0.001:
         dir_bg_x, dir_bg_y = 1.0, 0.0
     else:
-        dir_bg_x = vec_bg_x / dist_goal_to_striker
-        dir_bg_y = vec_bg_y / dist_goal_to_striker  
+        dir_bg_x = vec_bg_x / dist_goal_to_ball
+        dir_bg_y = vec_bg_y / dist_goal_to_ball
 
     # --- BEHAVIOR STATE MACHINE ---
     is_chasing = False
 
-    if (dist_goal_to_striker < 1.5 and striker_pos[0] > curr_pos[0]) or dist_goal_to_striker < 1.0:
-        target_x = striker_pos[0]
-        target_y = striker_pos[1]
+    if (dist_goal_to_ball < 1.5 and ball_pos[0] > curr_pos[0]) or dist_goal_to_ball < 1.0:
+        target_x = ball_pos[0]
+        target_y = ball_pos[1]
         is_chasing = True
 
-    elif dist_goal_to_striker < 2.0:
+    elif dist_goal_to_ball < 2.0:
         # STATE 2: LATERAL CONTAINMENT (The Wall)
         # Anchor the depth 2.0m away from the goal center.
         # Purely mirror the Y movement to slide laterally and block the lane.
-        target_x = striker_pos[0] + 0.3
-        target_y = max(min(striker_pos[1], 1.3), -1.3)
+        target_x = ball_pos[0] + 0.3
+        target_y = max(min(ball_pos[1], 1.3), -1.3)
 
-    elif dist_goal_to_striker <= 3.0:
+    elif dist_goal_to_ball <= 3.0:
         # STATE 3: MAN-MARKING 
-        # Stay exactly MARKING_DIST away from the striker.
-        target_x = striker_pos[0] + (dir_bg_x * MARKING_DIST)
-        target_y = striker_pos[1] + (dir_bg_y * MARKING_DIST)
+        # Stay exactly MARKING_DIST away from the ball.
+        target_x = ball_pos[0] + (dir_bg_x * MARKING_DIST)
+        target_y = ball_pos[1] + (dir_bg_y * MARKING_DIST)
 
     else:
         # STATE 4: HOLD THE LINE 
@@ -96,25 +87,25 @@ while robot.step(timestep) != -1:
     dist_to_target = math.hypot(dx, dy)
 
     angle_to_spot = math.atan2(dy, dx)
-    angle_to_striker = math.atan2(striker_pos[1] - curr_pos[1], striker_pos[0] - curr_pos[0])
+    angle_to_ball = math.atan2(ball_pos[1] - curr_pos[1], ball_pos[0] - curr_pos[0])
 
     # === HYBRID BEHAVIOR CORE LOGIC ===
     if dist_to_target > 0.15 or is_chasing:
         # 1. RECOVERY SPRINT: We are out of position or tackling!
-        # Stop looking at the striker. Look exactly at the waypoint and drive there fast.
+        # Stop looking at the ball. Look exactly at the waypoint and drive there fast.
         target_angle = angle_to_spot
-        base_speed = LINEAR_SPEED
+        base_speed = BASE_SPEED
             
     else:
         # 2. JOCKEY MODE: We are in the pocket!
-        # Lock eyes on the striker and use forward/reverse to hold the gap.
-        target_angle = angle_to_striker
+        # Lock eyes on the ball and use forward/reverse to hold the gap.
+        target_angle = angle_to_ball
         
         if dist_to_target < 0.05:
             base_speed = 0.0
         else:
-            speed_mag = LINEAR_SPEED * (dist_to_target / 0.15)
-            speed_mag = max(speed_mag, 0.1)
+            speed_mag = BASE_SPEED * (dist_to_target / 0.15)
+            speed_mag = max(speed_mag, 5.0)
             
             # REVERSE GEAR CHECK
             angle_diff = angle_to_spot - my_heading
@@ -133,7 +124,7 @@ while robot.step(timestep) != -1:
 
     error_rate = angle_error - prev_error
     turn_amount = (Kp * angle_error) + (Kd * error_rate)
-    turn_amount = max(min(turn_amount, ANGULAR_SPEED), -ANGULAR_SPEED)
+    turn_amount = max(min(turn_amount, DIFFERENTIAL_SPEED), -DIFFERENTIAL_SPEED)
     prev_error = angle_error 
     
     # Forgiving Pivot Logic (Brakes if we need to make a sharp turn)
@@ -148,9 +139,10 @@ while robot.step(timestep) != -1:
     base_speed_curr += (current_base_speed - base_speed_curr) * ACCEL
     turn_curr += (turn_amount - turn_curr) * ACCEL
 
-    # INVERSE KINEMATICS
-    left_speed = (base_speed_curr - (turn_curr * AXLE_LENGTH / 2.0)) / WHEEL_RADIUS
-    right_speed = (base_speed_curr + (turn_curr * AXLE_LENGTH / 2.0)) / WHEEL_RADIUS
+    # Because base_speed correctly flips to negative in the logic above, 
+    # standard mixing works perfectly without breaking the steering!
+    left_speed = base_speed_curr - turn_curr
+    right_speed = base_speed_curr + turn_curr
     
     # Motor Clamp
     left_speed = max(min(left_speed, 21), -21)

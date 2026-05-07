@@ -35,8 +35,8 @@ teleop_data = [] # List to store all our logs
 ball_node = robot.getFromDef("Ball")
 
 # ================= PARAMETERS =================
-BASE_SPEED = 0.3           # Common-mode linear speed command
-DIFFERENTIAL_SPEED = 4.0    # Differential speed applied between wheels for rotational yaw
+BASE_SPEED = 15.0           # Common-mode linear speed command
+DIFFERENTIAL_SPEED = 5.0    # Differential speed applied between wheels for rotational yaw
 ACCEL = 0.2             # Smoothing factor for motor commands (0.0 = no movement, 1.0 = instant change) 
 SHOOT_POWER = 3.0  
 LOG_FREQUENCY = 8  
@@ -94,6 +94,11 @@ while robot.step(timestep) != -1:
         if key == ord('A'): w_target = DIFFERENTIAL_SPEED
         elif key == ord('D'): w_target = -DIFFERENTIAL_SPEED  
 
+
+
+
+
+######################################  not our focus currently (shooting logic) ######################################  
         # Shooting (Overrides Dribbling)
         if key == ord(' '):
             if is_dribbling:
@@ -104,10 +109,10 @@ while robot.step(timestep) != -1:
                 kick_vx = np.cos(heading) * SHOOT_POWER
                 kick_vy = np.sin(heading) * SHOOT_POWER
                 ball_node.setVelocity([kick_vx, kick_vy, 0.5, 0.0, 0.0, 0.0])
-
+#######################################################################################################################                    
         key = keyboard.getKey()
-
-        # --- APPLY PSEUDO-DRIBBLER PHYSICS ---
+########################################## sticking ball to the front of the robot ####################################
+    # --- APPLY PSEUDO-DRIBBLER PHYSICS ---
     if is_dribbling and shoot_flag == 0:
         # Calculate the ideal Cartesian coordinate of the dribbler notch
         notch_x = pos[0] + np.cos(heading) * DRIBBLER_OFFSET
@@ -119,21 +124,25 @@ while robot.step(timestep) != -1:
         
         # Lock the ball's velocity to pull it into the notch, killing erratic spin
         ball_node.setVelocity([pull_vx, pull_vy, 0.0, 0.0, 0.0, 0.0])
+#######################################################################################################################
 
-    # 2. Apply Motor Smoothing (v_curr is now m/s, w_curr is now rad/s)
+
+
+
+    # 2. Apply Motor Smoothing
     v_curr += (v_target - v_curr) * ACCEL
     w_curr += (w_target - w_curr) * ACCEL
     
-    # 3. INVERSE KINEMATICS
-    left_omega = (v_curr - (w_curr * AXLE_LENGTH / 2.0)) / WHEEL_RADIUS
-    right_omega = (v_curr + (w_curr * AXLE_LENGTH / 2.0)) / WHEEL_RADIUS
-
-    left_omega = max(min(left_omega, 21.0), -21.0)
-    right_omega = max(min(right_omega, 21.0), -21.0)
+    # Calculate final wheel angular velocities (rad/s)
+    # left_omega = v - w, right_omega = v + w
+    # The 'w' component is the differential speed, increasing the speed of one wheel 
+    # relative to the other to enable turning without lateral strafing.
+    left_omega = max(min(v_curr - w_curr, 21.0), -21.0)
+    right_omega = max(min(v_curr + w_curr, 21.0), -21.0)
 
     left_motor.setVelocity(left_omega)
     right_motor.setVelocity(right_omega)
-
+    
     # 3. Data Logging
     if step_counter % LOG_FREQUENCY == 0:
         # --- ATTACKER MATH ---

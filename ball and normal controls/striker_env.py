@@ -8,9 +8,6 @@ Changes in this version
   every episode instead of fixed spawn points. This prevents all
   algorithms from overfitting to one specific defensive configuration
   and makes trained policies more robust.
-- Ball removed: the striker robot's own position is now used in place
-  of the ball for all progress, beaten-defender, goal, and
-  out-of-bounds calculations.  Dribbling logic has been removed.
 
 Compatible with:
   BC        — continuous Box, no env interaction during training
@@ -52,12 +49,12 @@ Defender spawn zone (attacking half)
 Reward function
 -----------------
   Progress          :  clip(progress, -0.5, 0.5) * 20
-  Defender beaten   :  +50 per defender passed (robot x > defender x + 0.15)
-  Goal scored       :  +100,  terminated=True  (robot enters goal zone)
-  Collision         :  -5 per step in contact with a defender
+  Ball possession   :  +0.3 per step while dribbling
+  Defender beaten   :  +50 per defender passed
+  Goal scored       :  +100,  terminated=True
+  Collision         :  -10 per step in contact
   Idle penalty      :  -0.5 per step (gas < 0.1 and steer < 0.1)
-  Facing wrong way  :  -2.0 per step (cos_theta < 0)
-  Out of bounds     :  -100, terminated=True
+  Out of bounds     :  -15,   terminated=True
   Time step tax     :  -0.2 per step
   Timeout           :  truncated=True  (NOT terminated)
 """
@@ -126,8 +123,12 @@ class StrikerRLEnv(gym.Env):
         self.robot_trans_field = self.striker_node.getField("translation")
         self.robot_rot_field   = self.striker_node.getField("rotation")
 
+        self.ball_node        = self.robot.getFromDef("Ball")
+        self.ball_trans_field = self.ball_node.getField("translation")
+
         self.init_robot_pos = self.robot_trans_field.getSFVec3f()
         self.init_robot_rot = self.robot_rot_field.getSFRotation()
+        self.init_ball_pos  = self.ball_trans_field.getSFVec3f()
 
         # ── defenders ─────────────────────────────────────────────────
         # Store both the node (velocity/position reads) and the
@@ -146,19 +147,19 @@ class StrikerRLEnv(gym.Env):
                 self.def_init_z.append(tf.getSFVec3f()[2])
 
         # ── parameters ───────────────────────────────────────────────
-        self.MY_GOAL_CENTER = [2.0, 0.0]
-        self.MAX_SPEED      = 0.3  # m/s
-        self.TURN_BIAS      = 4.0  # rad/s
-        self.WHEEL_RADIUS   = 0.02
-        self.AXLE_LENGTH    = 0.052
-        self.ACCEL          = 0.2
-        self.INNER_STEPS    = 8
+        self.MY_GOAL_CENTER  = [2.0, 0.0]
+        self.MAX_SPEED       = 15.0
+        self.TURN_BIAS       = 5.0
+        self.ACCEL           = 0.2
+        self.DRIBBLER_OFFSET = 0.05
+        self.DRIBBLER_PULL   = 15.0
+        self.INNER_STEPS     = 8
 
         # ── runtime state ─────────────────────────────────────────────
         self.v_curr           = 0.0
         self.w_curr           = 0.0
         self.step_count       = 0
-        self.prev_robot_dist  = 0.0   # distance of robot to goal (replaces prev_ball_dist)
+        self.prev_ball_dist   = 0.0
         self.beaten_defenders = set()
 
     # ──────────────────────────────────────────────────────────────────
@@ -205,6 +206,14 @@ class StrikerRLEnv(gym.Env):
         self.robot_trans_field.setSFVec3f(self.init_robot_pos)
         self.robot_rot_field.setSFRotation(self.init_robot_rot)
 
+        curriculum_ball_pos = [
+            self.init_robot_pos[0] + 0.06,
+            self.init_robot_pos[1],
+            self.init_ball_pos[2],
+        ]
+        self.ball_trans_field.setSFVec3f(curriculum_ball_pos)
+        self.ball_node.setVelocity([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+
         # Randomise defender positions every episode
         self._randomise_defenders()
 
@@ -215,12 +224,9 @@ class StrikerRLEnv(gym.Env):
         self.w_curr           = 0.0
         self.step_count       = 0
         self.beaten_defenders = set()
-
-        # Initialise previous robot-to-goal distance from the spawn position
-        rp = self.robot_trans_field.getSFVec3f()
-        self.prev_robot_dist = np.hypot(
-            self.MY_GOAL_CENTER[0] - rp[0],
-            self.MY_GOAL_CENTER[1] - rp[1],
+        self.prev_ball_dist   = np.hypot(
+            self.MY_GOAL_CENTER[0] - curriculum_ball_pos[0],
+            self.MY_GOAL_CENTER[1] - curriculum_ball_pos[1],
         )
 
         return self._get_obs(), {}
@@ -286,51 +292,67 @@ class StrikerRLEnv(gym.Env):
         v_target = gas   * self.MAX_SPEED
         w_target = steer * self.TURN_BIAS
 
+        is_dribbling = False
         for _ in range(self.INNER_STEPS):
             self.v_curr += (v_target - self.v_curr) * self.ACCEL
             self.w_curr += (w_target - self.w_curr) * self.ACCEL
 
-            # INVERSE KINEMATICS
-            left_speed  = (self.v_curr - (self.w_curr * self.AXLE_LENGTH / 2.0)) / self.WHEEL_RADIUS
-            right_speed = (self.v_curr + (self.w_curr * self.AXLE_LENGTH / 2.0)) / self.WHEEL_RADIUS
-
-            left_speed  = np.clip(left_speed,  -21.0, 21.0)
-            right_speed = np.clip(right_speed, -21.0, 21.0)
+            left_speed  = np.clip(self.v_curr - self.w_curr, -20.0, 20.0)
+            right_speed = np.clip(self.v_curr + self.w_curr, -20.0, 20.0)
             self.left_motor.setVelocity(left_speed)
             self.right_motor.setVelocity(right_speed)
+
+            pos           = self.gps.getValues()
+            comp          = self.compass.getValues()
+            heading       = np.arctan2(comp[0], comp[1])
+            ball_pos      = self.ball_node.getPosition()
+
+            dx            = ball_pos[0] - pos[0]
+            dy            = ball_pos[1] - pos[1]
+            dist_to_ball  = np.hypot(dx, dy)
+            angle_to_ball = np.arctan2(dy, dx)
+            angle_diff    = (angle_to_ball - heading + np.pi) % (2 * np.pi) - np.pi
+
+            if dist_to_ball < 0.1 and abs(angle_diff) < 0.5:
+                is_dribbling = True
+                notch_x = pos[0] + np.cos(heading) * self.DRIBBLER_OFFSET
+                notch_y = pos[1] + np.sin(heading) * self.DRIBBLER_OFFSET
+                pull_vx = (notch_x - ball_pos[0]) * self.DRIBBLER_PULL
+                pull_vy = (notch_y - ball_pos[1]) * self.DRIBBLER_PULL
+                self.ball_node.setVelocity([pull_vx, pull_vy, 0.0, 0.0, 0.0, 0.0])
 
             if self.robot.step(self.timestep) == -1:
                 sys.exit(0)
 
-        # ── Read striker position after inner steps ───────────────────
-        pos = self.gps.getValues()   # [x, y, z] of the striker robot
+        pos      = self.gps.getValues()
+        ball_pos = self.ball_node.getPosition()
 
-        dist_robot_to_goal = np.hypot(
-            self.MY_GOAL_CENTER[0] - pos[0],
-            self.MY_GOAL_CENTER[1] - pos[1],
+        dist_ball_to_goal = np.hypot(
+            self.MY_GOAL_CENTER[0] - ball_pos[0],
+            self.MY_GOAL_CENTER[1] - ball_pos[1],
         )
 
         reward     = -0.2
         terminated = False
         truncated  = False
 
-        # Idle penalty
         if abs(gas) < 0.1 and abs(steer) < 0.1:
             reward -= 0.5
 
-        obs       = self._get_obs()
+        obs = self._get_obs()
         cos_theta = obs[2]
 
-        # Progress reward: robot moving toward the goal
-        progress = self.prev_robot_dist - dist_robot_to_goal
-        reward  += np.clip(progress, -0.5, 0.5) * 20.0
-        self.prev_robot_dist = dist_robot_to_goal
 
-        # Penalty for facing away from goal
+        progress = self.prev_ball_dist - dist_ball_to_goal
+        reward  += np.clip(progress, -0.5, 0.5) * 20.0
+        self.prev_ball_dist = dist_ball_to_goal
+
+        if is_dribbling:
+            reward += 0.3
+
         if cos_theta < 0:
             reward -= 2.0
-
-        # Collision penalty: robot too close to any defender
+        
         for defender in self.defenders:
             def_pos     = defender.getPosition()
             dist_to_def = np.hypot(def_pos[0] - pos[0], def_pos[1] - pos[1])
@@ -338,26 +360,25 @@ class StrikerRLEnv(gym.Env):
                 reward -= 5.0
                 break
 
-        # Beaten-defender bonus: robot has passed a defender
         for idx, defender in enumerate(self.defenders):
             if idx not in self.beaten_defenders:
                 def_pos = defender.getPosition()
-                if pos[0] > def_pos[0] + 0.1:
+                if ball_pos[0] > def_pos[0] + 0.15:
                     reward += 50.0
                     self.beaten_defenders.add(idx)
 
-        # 1. GOAL CONDITION — robot enters the goal zone
-        if pos[0] > 2.0 and (-0.25 < pos[1] < 0.25):
+        # 1. GOAL CONDITION
+        if ball_pos[0] > 2.0 and (-0.25 < ball_pos[1] < 0.25):
             reward += 100.0
             terminated = True
 
-        # 2. OUT OF BOUNDS — robot leaves the field
+        # 2. OUT OF BOUNDS (BALL)
         elif (
-            (pos[0] > 2.0 and pos[1] <= -0.25) or  # Missed goal (right side)
-            (pos[0] > 2.0 and pos[1] >= 0.25)  or  # Missed goal (left side)
-            (pos[0] < -2.0)                    or  # Went behind own baseline
-            (pos[1] >  1.3)                    or  # Out on left sideline
-            (pos[1] < -1.3)                        # Out on right sideline
+            (ball_pos[0] > 2.0 and ball_pos[1] <= -0.25) or  # Missed goal (Right side)
+            (ball_pos[0] > 2.0 and ball_pos[1] >= 0.25)  or  # Missed goal (Left side)
+            (ball_pos[0] < -2.0) or                          # Went behind own baseline
+            (ball_pos[1] > 1.3)  or                          # Out on left sideline
+            (ball_pos[1] < -1.3)                             # Out on right sideline
         ):
             reward -= 100.0
             terminated = True

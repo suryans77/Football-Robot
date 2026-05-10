@@ -50,8 +50,8 @@ while robot.step(timestep) != -1:
     fx = striker_compass[0]   # r00
     fy = striker_compass[3]   # r10
 
-    striker_pos[0] += 0.06 * fx
-    striker_pos[1] += 0.06 * fy
+    striker_pos[0] += 0.1 * fx
+    striker_pos[1] += 0.1 * fy
 
     # ── STRATEGY: compute ideal blocking spot (unchanged from original) ─
     vec_x = striker_pos[0] - MY_GOAL_CENTER[0]

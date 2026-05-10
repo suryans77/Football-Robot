@@ -31,9 +31,8 @@ from my_envs.striker_env import StrikerRLEnv, ACTION_SET
 # Config
 # ──────────────────────────────────────────────────────────────────────────────
 
-CKPT_PATH   = "type_2_pureIQ.pt"
+CKPT_PATH   = "full_pureIQ_best.pt"
 N_EPISODES  = 100
-GOAL_THRESH = 0.25   # must match striker_env
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -124,12 +123,12 @@ def evaluate():
             prev_beaten     = len(env.beaten_defenders)
 
             if terminated or truncated:
-                ball_pos     = env.ball_node.getPosition()
+                pos    = env.robot_trans_field.getSFVec3f()
                 dist_to_goal = np.hypot(
-                    env.MY_GOAL_CENTER[0] - ball_pos[0],
-                    env.MY_GOAL_CENTER[1] - ball_pos[1],
+                    env.MY_GOAL_CENTER[0] - pos[0],
+                    env.MY_GOAL_CENTER[1] - pos[1],
                 )
-                if terminated and dist_to_goal < GOAL_THRESH:
+                if terminated and pos[0] > 2.0 and (-0.25 < pos[1] < 0.25):
                     outcome = "goal"
                 elif truncated:
                     outcome = "timeout"

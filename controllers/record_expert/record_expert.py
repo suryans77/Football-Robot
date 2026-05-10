@@ -286,18 +286,22 @@ def record_data():
             next_obs, reward, terminated, truncated, _ = env.step(action)
             obs = next_obs
 
-            # If we won (reward is high because of the +100 goal bonus)
-            if terminated and reward > -200.0:
+            # If we won (reached goal) OR ran out of time (truncated)
+            if (terminated and reward > 90.0) or truncated:
                 current_episode[-1]["done"] = True
                 expert_data.extend(current_episode)
                 session_accepted += 1
                 save_data(expert_data, AUTOSAVE_PATH, label="autosave")
-                print(f"--> AUTO-ACCEPTED (Goal Reached!) frames={len(current_episode)} total={len(expert_data)}")
+                
+                # Custom print message based on how it ended
+                reason = "Goal Reached!" if terminated else "Time Limit Reached!"
+                print(f"--> AUTO-ACCEPTED ({reason}) frames={len(current_episode)} total={len(expert_data)}")
+                
                 current_episode = []
                 obs, _ = env.reset()
             
-            # If we failed (ran out of time or went out of bounds)
-            elif terminated or truncated:
+            # If we failed (went out of bounds / hit a bad terminal state)
+            elif terminated:
                 print(f"--> Env ended in failure — discarding "
                       f"({len(current_episode)} frames).")
                 current_episode = []

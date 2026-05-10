@@ -96,22 +96,22 @@ def index_to_action(idx: int) -> np.ndarray:
 
 CFG = dict(
     # ── checkpoints ──────────────────────────────────────────────────
-    iq_checkpoint       = "full_pureIQ_best.pt",   # IQ-Learn weights to load
+    iq_checkpoint       = "full_pureIQ_1.pt",   # IQ-Learn weights to load
     save_path           = "dqn_finetuned.pt",
     save_path_best      = "dqn_finetuned_best.pt",
 
     # ── training ─────────────────────────────────────────────────────
-    total_timesteps     = 100_000,
+    total_timesteps     = 70_000,
     batch_size          = 256,
-    gamma               = 0.95,            # match IQ-Learn gamma
+    gamma               = 0.97,            # match IQ-Learn gamma
     lr                  = 1e-4,            # lower than IQ-Learn (3e-4) — fine-tuning
     target_update_every = 500,             # hard sync every N steps
     grad_clip           = 10.0,
 
     # ── epsilon schedule ─────────────────────────────────────────────
     # Low start because the policy is already good.
-    # 0.25 means 1-in-4 actions are random exploration.
-    eps_start           = 0.25,
+    # 0.2 means 1-in-5 actions are random exploration.
+    eps_start           = 0.2,
     eps_end             = 0.05,
     eps_decay_steps     = 40_000,          # decay over first 40% of training
 

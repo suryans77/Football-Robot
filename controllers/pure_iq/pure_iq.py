@@ -76,18 +76,18 @@ def index_to_action(idx: int) -> np.ndarray:
 # ──────────────────────────────────────────────────────────────────────────────
 
 CFG = dict(
-    expert_path         = "full_data.pkl",
+    expert_path         = "full_data_raw.pkl",
     save_path           = "full_pureIQ.pt",
     save_path_best      = "full_pureIQ_best.pt",
     total_timesteps     = 100_000,
     batch_size          = 256,
     hidden              = [256, 256],
     lr_q                = 3e-4,
-    gamma               = 0.95,
+    gamma               = 0.99,
     alpha               = 0.1,
     learn_alpha         = True,
     target_entropy      = -np.log(1.0 / N_ACTIONS) * 0.5,
-    iq_reg              = 1e-3,
+    iq_reg              = 1e-4,
     q_updates_per_step  = 1,
     tau                 = 0.005,
     warmup_steps        = 1_000,
